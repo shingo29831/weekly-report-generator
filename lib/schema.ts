@@ -15,6 +15,7 @@ export const settingsSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
+  freeMemo: z.string().optional(), // 自由記述メモを追加
   progressRough: z.string(),
   issuesRough: z.string(),
   memberProgressRough: z.record(z.string(), z.string()),

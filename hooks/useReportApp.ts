@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
-import { fetchWithRetry } from "@/lib/apiClient";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -25,7 +24,6 @@ const DEFAULT_SETTINGS: Settings = {
   ],
 };
 
-// Base64文字列をFileオブジェクトに変換するユーティリティ
 const dataURLtoFile = (dataurl: string, filename: string): File => {
   const arr = dataurl.split(',');
   const mimeMatch = arr[0].match(/:(.*?);/);
@@ -41,10 +39,14 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 export const useReportApp = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [input, setInput] = useState<ReportInput>({ progressRough: "", issuesRough: "", memberProgressRough: {} });
+  const [input, setInput] = useState<ReportInput>({ 
+    freeMemo: "", 
+    progressRough: "", 
+    issuesRough: "", 
+    memberProgressRough: {} 
+  });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
   
-  // テンプレート状態の管理
   const [templateState, setTemplateState] = useState<TemplateState>({
     source: "default",
     name: "プロジェクト内テンプレート (template.xlsx)"
@@ -55,11 +57,9 @@ export const useReportApp = () => {
   const [isJsonValid, setIsJsonValid] = useState(false);
 
   useEffect(() => {
-    // 設定の復元
     const saved = localStorage.getItem("reportSettings");
     if (saved) setSettings(JSON.parse(saved));
 
-    // 前回出力したテンプレートの復元
     const savedTemplate = localStorage.getItem("reportTemplate");
     if (savedTemplate) {
       try {
@@ -124,7 +124,6 @@ export const useReportApp = () => {
     }
   };
 
-  // 手動でファイルをアップロードした時の処理
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -132,7 +131,6 @@ export const useReportApp = () => {
     }
   };
 
-  // テンプレートを初期状態に戻す処理
   const resetTemplate = () => {
     localStorage.removeItem("reportTemplate");
     setTemplateState({ source: "default", name: "プロジェクト内テンプレート (template.xlsx)" });
@@ -153,7 +151,6 @@ export const useReportApp = () => {
       formData.append("settings", JSON.stringify(settings));
       formData.append("report", JSON.stringify(currentReport));
       
-      // テンプレートデータの割り当て
       if (templateState.source === "uploaded" && templateState.file) {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
@@ -171,7 +168,6 @@ export const useReportApp = () => {
       const url = window.URL.createObjectURL(blob);
       const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
       
-      // ダウンロード実行
       const a = document.createElement("a");
       a.href = url;
       a.download = fileName;
@@ -179,7 +175,6 @@ export const useReportApp = () => {
       a.click();
       window.URL.revokeObjectURL(url);
       
-      // 次回用にローカルストレージへ保存する処理
       const reader = new FileReader();
       reader.readAsDataURL(blob);
       reader.onloadend = () => {
@@ -213,9 +208,10 @@ export const useReportApp = () => {
   };
 
   const generateManualPrompts = () => {
-    const currentProgress = formattedReport?.progress || input.progressRough;
+    // 画像プロンプト用には、テキスト生成結果があればそれを優先、なければ自由記述か進捗メモを使用
+    const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
     const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
-    const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || "特筆事項なし"}`).join("\n");
+    const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || ""}`).filter(line => !line.endsWith(": ")).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
 
@@ -226,13 +222,14 @@ export const useReportApp = () => {
 ${memberListContext}
 
 【入力情報】
-チーム全体の進捗メモ: ${input.progressRough}
-チーム全体の課題・困りごとメモ: ${input.issuesRough}
-各メンバーの個別進捗メモ（追加分）:
-${memberProgressList}
+自由記述メモ（全体）: ${input.freeMemo || "特筆事項なし"}
+チーム全体の進捗メモ（詳細）: ${input.progressRough || "特筆事項なし"}
+チーム全体の課題・困りごとメモ（詳細）: ${input.issuesRough || "特筆事項なし"}
+各メンバーの個別進捗メモ（詳細）:
+${memberProgressList || "特筆事項なし"}
 
 【推論要件】
-1. 進捗の振り分け: 「進捗メモ」を分析し、特定の個人の成果と判明したものは個人の報告に振り分ける。
+1. 情報の統合と振り分け: 「自由記述メモ」や「各詳細メモ」の内容を総合的に分析してください。特定の個人の作業や成果と判明したものは個人の報告（members[].progress）に振り分け、それ以外の全体概要を「progress」に記載してください。
 2. JSONテキストのみを出力すること。
 
 {

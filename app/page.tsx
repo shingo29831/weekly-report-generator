@@ -1,4 +1,4 @@
-// @ai-role: Main dashboard UI implementing dynamic template persistence display and workflow
+// @ai-role: Main dashboard UI implementing dynamic template persistence display and workflow with low-barrier free memo input
 
 "use client";
 
@@ -99,30 +99,57 @@ export default function Home() {
         <button onClick={() => setCurrentStep("settings")} className={`py-2 px-4 ${currentStep === "settings" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>班・メンバー設定</button>
       </nav>
 
-      {/* STEP 1 */}
+      {/* STEP 1: メモ入力 */}
       {currentStep === "input" && (
         <section className="space-y-6 animate-in fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">今週の進捗（メモ書き）</label>
-              <textarea className="w-full border rounded p-3 text-sm h-40" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} placeholder="個人からチームまで実施したことを適当に記入..." />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">課題・困りごと（メモ書き）</label>
-              <textarea className="w-full border rounded p-3 text-sm h-40" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} placeholder="課題や来週の予定を記入..." />
-            </div>
+          
+          {/* 追加：自由記述メモ枠 */}
+          <div className="bg-white p-5 rounded-lg border shadow-sm">
+            <label className="block text-base font-bold mb-2 text-indigo-900">
+              📝 今週の活動メモ（何でも自由に記述）
+            </label>
+            <p className="text-xs text-gray-500 mb-3">
+              誰が何をやったか、困ったことなど、思いつくままに箇条書きで適当に書いてください。<br/>
+              （例: 〇〇さんがUI設計した。API連携でエラーが出て困っている。来週はDB構築する等）
+            </p>
+            <textarea 
+              className="w-full border-2 rounded p-3 text-sm h-40 focus:border-indigo-500 outline-none transition-colors bg-gray-50 focus:bg-white" 
+              value={input.freeMemo || ""} 
+              onChange={(e) => setInput({ ...input, freeMemo: e.target.value })} 
+              placeholder="ここに全てを書き込んでください。" 
+            />
           </div>
-          <div className="pt-4 border-t">
-            <h3 className="font-semibold mb-4 text-gray-800">メンバー個別メモ（必要な場合のみ）</h3>
-            <div className="grid gap-2">
-              {settings.members.map((m) => (
-                <div key={m.id} className="flex items-center gap-4 bg-gray-50 p-2 rounded border">
-                  <span className="w-32 text-xs font-bold text-gray-600 truncate">{m.name}</span>
-                  <input className="flex-1 border rounded p-2 text-sm bg-white" placeholder="個別の担当作業があれば入力..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
+
+          {/* 既存の入力欄（アコーディオン化） */}
+          <details className="group bg-gray-50 p-4 rounded border cursor-pointer">
+            <summary className="font-bold text-sm text-gray-700 list-none flex justify-between items-center">
+              <span>さらに詳細に分けて入力する（任意・必要な場合のみ）</span>
+              <span className="transition group-open:rotate-180">▼</span>
+            </summary>
+            <div className="pt-6 mt-4 border-t border-gray-200 cursor-default space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">チーム全体の進捗</label>
+                  <textarea className="w-full border rounded p-3 text-sm h-32" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} />
                 </div>
-              ))}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">課題・困りごと</label>
+                  <textarea className="w-full border rounded p-3 text-sm h-32" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <h3 className="font-semibold mb-3 text-gray-800 text-sm">メンバー個別メモ</h3>
+                <div className="grid gap-2">
+                  {settings.members.map((m) => (
+                    <div key={m.id} className="flex items-center gap-4 bg-white p-2 rounded border">
+                      <span className="w-32 text-xs font-bold text-gray-600 truncate">{m.name}</span>
+                      <input className="flex-1 border rounded p-2 text-sm bg-white" placeholder="個別の担当作業があれば..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          </details>
 
           <div className="flex gap-4 pt-4">
             <button onClick={handleInternalGenerate} className="flex-1 bg-gray-800 text-white font-bold py-3 rounded hover:bg-gray-900 transition-colors">
