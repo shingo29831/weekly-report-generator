@@ -1,15 +1,19 @@
-// @ai-role: custom hook managing state, local storage, and business flows for the UI
+// @ai-role: custom hook managing state and business flows with external AI integration logic
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
 import { fetchWithRetry } from "@/lib/apiClient";
 
 const DEFAULT_SETTINGS: Settings = {
-  groupNumber: "1",
-  theme: "UIの形状とユーザークリック率の関係性、またはAIベースのRPAマクロ生成",
-  themeDetails: "UI形状の変化がユーザーのクリック行動に与える統計的影響の調査、およびAIを活用した業務自動化マクロの効率的な生成手法の提案を行う。",
+  groupNumber: "4",
+  theme: "マクロ最適化AI",
+  themeDetails: "ユーザーが専門知識がなくても最適なマクロ生成できるようにするためAIに作業を理解させ、最適化されたマクロを生成する。",
   members: [
-    { id: "2201001", name: "梅田 慎悟" },
+    { id: "8", name: "梅田 真吾" },
+    { id: "9", name: "大津 幸輝" },
+    { id: "13", name: "蟹江 りゅうた" },
+    { id: "31", name: "林 楓也" },
+    { id: "43", name: "吉田 誠司" },
   ],
 };
 
@@ -43,7 +47,7 @@ export const useReportApp = () => {
       setFormattedReport(data.result);
       alert("AI推論が完了しました。");
     } catch (error) {
-      alert("AI推論に失敗しました。時間をおいて再試行してください。");
+      alert("AI推論に失敗しました。");
     } finally {
       setIsLoading(false);
     }
@@ -68,7 +72,7 @@ export const useReportApp = () => {
       const res = await fetch("/api/excel", { method: "POST", body: formData });
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || "ファイルの生成に失敗しました。");
+        throw new Error(errorData.error || "生成失敗");
       }
 
       const blob = await res.blob();
@@ -88,16 +92,8 @@ export const useReportApp = () => {
 
   const generateManualPrompts = () => {
     const currentProgress = formattedReport?.progress || input.progressRough;
-    
-    // メンバーリストの構築
-    const memberListContext = settings.members
-      .map(m => `- ${m.name} (出席番号: ${m.id})`)
-      .join("\n");
-
-    // メンバーの追加進捗メモ
-    const memberProgressList = settings.members
-      .map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || "特筆事項なし"}`)
-      .join("\n");
+    const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
+    const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || "特筆事項なし"}`).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
 
@@ -113,24 +109,16 @@ ${memberListContext}
 各メンバーの個別進捗メモ（追加分）:
 ${memberProgressList}
 
-【推論と出力の要件】
-1. 進捗の振り分け: 「チーム全体の進捗メモ」の内容を分析し、特定の個人（メンバー）が関わった作業や成果と判明したものは、その詳細な内容を該当する個人の進捗報告（members[].progress）に振り分けて詳しく記載してください。
-2. チーム全体の進捗: 個人の詳細を移した上で、チーム全体としての進捗概要（大まかな進捗）を「progress」に記載してください。
-3. 課題の整理: 「課題・困りごとメモ」から、「今週の課題」「来週やること」「今週の一番困っていること」を抽出し、それぞれ該当するキーに清書してください。
-4. 以下のJSONフォーマットの構造に厳密に従い、JSONテキストのみを出力してください。Markdownのコードブロック記法(\`\`\`)は使用しないでください。
+【推論要件】
+1. 進捗の振り分け: 「進捗メモ」を分析し、特定の個人の成果と判明したものは個人の報告に振り分ける。
+2. JSONテキストのみを出力すること。
 
 {
-  "progress": "チーム全体としての今週の大まかな進捗",
-  "issues": "今週の課題（何ができなかったか・今後何をやらないといけないか）",
+  "progress": "チーム全体の概要",
+  "issues": "今週の課題",
   "nextWeek": "来週やること",
-  "trouble": "今週の一番困ってること",
-  "members": [
-    {
-      "id": "メンバーの出席番号",
-      "name": "メンバーの氏名",
-      "progress": "個人の成果や担当した詳細な作業内容"
-    }
-  ]
+  "trouble": "今週一番困ってること",
+  "members": [ { "id": "...", "name": "...", "progress": "..." } ]
 }`;
 
     const imagePrompt = `# 依頼概要
@@ -147,56 +135,26 @@ ${memberProgressList}
   const handleJsonImport = () => {
     try {
       const parsed = JSON.parse(jsonInput);
-      
       const parsedMemberProgress: Record<string, string> = {};
       if (Array.isArray(parsed.members)) {
-        parsed.members.forEach((m: any) => {
-          parsedMemberProgress[m.id] = m.progress;
-        });
+        parsed.members.forEach((m: any) => { parsedMemberProgress[m.id] = m.progress; });
       }
-
-      const report: FormattedReport = {
+      setFormattedReport({
         progress: parsed.progress || "",
         issues: parsed.issues || "",
         nextWeek: parsed.nextWeek || "",
         trouble: parsed.trouble || "",
         memberProgress: parsedMemberProgress,
-      };
-
-      setFormattedReport(report);
-      alert("JSONデータを正常に読み込みました。「Excelファイルを出力」ボタンから出力できます。");
+      });
+      alert("JSON読み込み完了");
     } catch (error) {
-      alert("JSONのパースに失敗しました。形式が正しいか確認してください。");
+      alert("JSONの形式が正しくありません。");
     }
   };
 
-  const handleJsonFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setJsonInput(content);
-    };
-    reader.readAsText(file);
-    e.target.value = '';
-  };
-
   return {
-    settings,
-    updateSettings,
-    input,
-    setInput,
-    formattedReport,
-    uploadedFile,
-    setUploadedFile,
-    isLoading,
-    jsonInput,
-    setJsonInput,
-    generateWithAPI,
-    downloadExcel,
-    generateManualPrompts,
-    handleJsonImport,
-    handleJsonFileUpload,
+    settings, updateSettings, input, setInput, formattedReport,
+    uploadedFile, setUploadedFile, isLoading, jsonInput, setJsonInput,
+    generateWithAPI, downloadExcel, generateManualPrompts, handleJsonImport
   };
 };

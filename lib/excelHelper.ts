@@ -1,10 +1,29 @@
-// @ai-role: server-side logic for manipulating Excel files
+// @ai-role: server-side logic for manipulating Excel files with explicit sheet cloning and custom styling
 
 import ExcelJS from "exceljs";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import fs from "fs";
 import path from "path";
 import { Settings, FormattedReport } from "./schema";
+
+const applyInputStyle = (cell: ExcelJS.Cell) => {
+  cell.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFDAF2D0' }
+  };
+  cell.alignment = {
+    wrapText: true,
+    vertical: 'top',
+    horizontal: 'left'
+  };
+  cell.border = {
+    top: { style: 'thin' },
+    left: { style: 'thin' },
+    bottom: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+};
 
 export const generateExcelFile = async (
   baseFileBuffer: ArrayBuffer | null,
@@ -25,41 +44,84 @@ export const generateExcelFile = async (
     } else if (fs.existsSync(rootPath)) {
       await workbook.xlsx.readFile(rootPath);
     } else {
-      throw new Error("テンプレートファイルが見つかりません。プロジェクトのルートまたは public/ に 'template.xlsx' を配置してください。");
+      throw new Error("テンプレートファイルが見つかりません。");
     }
   }
 
   const templateSheet = workbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
-  if (!templateSheet) {
-    const availableSheets = workbook.worksheets.map(s => s.name).join(", ");
-    throw new Error(`「ひな形」シートが見つかりません。現在のシート: ${availableSheets}`);
-  }
+  if (!templateSheet) throw new Error("「ひな形」シートが見つかりません。");
 
   const start = startOfWeek(targetDate, { weekStartsOn: 1 });
   const end = endOfWeek(targetDate, { weekStartsOn: 1 });
-  const sheetName = format(start, "MMdd");
+  // シート名を「mmdd週」に変更
+  const sheetName = `${format(start, "MMdd")}週`;
 
   let targetSheet = workbook.getWorksheet(sheetName);
   if (!targetSheet) {
     targetSheet = workbook.addWorksheet(sheetName);
-    // 根本解決: モデルをコピーする際、新しいシート名を明示的に指定して重複エラーを防ぐ
-    targetSheet.model = Object.assign({}, templateSheet.model, {
-      mergeCells: (templateSheet.model as any).mergeCells,
-      name: sheetName,
+    
+    targetSheet.properties = templateSheet.properties;
+    targetSheet.pageSetup = templateSheet.pageSetup;
+    targetSheet.views = templateSheet.views;
+
+    templateSheet.columns.forEach((col, index) => {
+      const newCol = targetSheet!.getColumn(index + 1);
+      newCol.width = col.width;
+      newCol.style = col.style;
     });
+
+    templateSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      const newRow = targetSheet!.getRow(rowNumber);
+      newRow.height = row.height;
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        const newCell = newRow.getCell(colNumber);
+        newCell.value = cell.value;
+        newCell.style = cell.style;
+      });
+    });
+
+    const merges = (templateSheet.model as any).merges;
+    if (merges && Array.isArray(merges)) {
+      merges.forEach((merge: string) => {
+        targetSheet!.mergeCells(merge);
+      });
+    }
   }
 
-  targetSheet.getCell("B2").value = `${settings.groupNumber}班`;
-  targetSheet.getCell("E2").value = format(start, "yyyy-MM-dd");
-  targetSheet.getCell("G2").value = format(end, "yyyy-MM-dd");
-  targetSheet.getCell("B6").value = report.progress || "";
-  targetSheet.getCell("B10").value = `${report.issues || ""}\n\n【来週やること】\n${report.nextWeek || ""}\n【今週の一番困ってること】\n${report.trouble || ""}`;
+  const cellB2 = targetSheet.getCell("B2");
+  cellB2.value = settings.groupNumber.replace(/[^0-9]/g, "");
+  applyInputStyle(cellB2);
+  
+  const cellF2 = targetSheet.getCell("F2");
+  cellF2.value = format(start, "yyyy/MM/dd");
+  applyInputStyle(cellF2);
+
+  const cellH2 = targetSheet.getCell("H2");
+  cellH2.value = format(end, "yyyy/MM/dd");
+  applyInputStyle(cellH2);
+
+  const cellB8 = targetSheet.getCell("B8");
+  cellB8.value = report.progress || "";
+  applyInputStyle(cellB8);
+  
+  const cellB11 = targetSheet.getCell("B11");
+  cellB11.value = `${report.issues || ""}\n\n【来週やること】\n${report.nextWeek || ""}\n【今週の一番困ってること】\n${report.trouble || ""}`;
+  applyInputStyle(cellB11);
 
   let row = 16;
   for (const member of settings.members) {
-    targetSheet.getCell(`B${row}`).value = member.id;
-    targetSheet.getCell(`C${row}`).value = member.name;
-    targetSheet.getCell(`D${row}`).value = report.memberProgress[member.id] || "";
+    if (row > 21) break;
+    const cellID = targetSheet.getCell(`B${row}`);
+    cellID.value = member.id;
+    applyInputStyle(cellID);
+
+    const cellName = targetSheet.getCell(`C${row}`);
+    cellName.value = member.name;
+    applyInputStyle(cellName);
+
+    const cellProgress = targetSheet.getCell(`D${row}`);
+    cellProgress.value = report.memberProgress[member.id] || "";
+    applyInputStyle(cellProgress);
     row++;
   }
 
