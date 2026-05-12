@@ -56,7 +56,7 @@ export default function Home() {
       {/* --- 適用中のテンプレート表示セクション --- */}
       <section className="bg-blue-50 p-4 rounded-md border border-blue-100">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-sm font-bold text-blue-900">更新対象ファイル ※前回提出したファイルをアップロードしてください。履歴がある場合は自動適用されています。</h2>
+          <h2 className="text-sm font-bold text-blue-900">更新対象ファイル ※前回の提出ファイルを入れてください。履歴がある場合は自動適用されます。</h2>
           {templateState.source !== "generated" && (
             <span className="text-xs font-bold px-2 py-1 rounded bg-blue-200 text-blue-900">
               {templateState.source === "default" && "初期テンプレート"}
