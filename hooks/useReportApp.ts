@@ -1,8 +1,16 @@
-// @ai-role: custom hook managing state, real-time validation, and workflow state updates
+// @ai-role: custom hook managing state, local storage, real-time validation, and template persistence
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
 import { fetchWithRetry } from "@/lib/apiClient";
+
+export interface TemplateState {
+  source: "default" | "uploaded" | "generated";
+  name: string;
+  timestamp?: string;
+  dataUrl?: string;
+  file?: File;
+}
 
 const DEFAULT_SETTINGS: Settings = {
   groupNumber: "4",
@@ -17,30 +25,64 @@ const DEFAULT_SETTINGS: Settings = {
   ],
 };
 
+// Base64文字列をFileオブジェクトに変換するユーティリティ
+const dataURLtoFile = (dataurl: string, filename: string): File => {
+  const arr = dataurl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while(n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new File([u8arr], filename, { type: mime });
+};
+
 export const useReportApp = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [input, setInput] = useState<ReportInput>({ progressRough: "", issuesRough: "", memberProgressRough: {} });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  
+  // テンプレート状態の管理
+  const [templateState, setTemplateState] = useState<TemplateState>({
+    source: "default",
+    name: "プロジェクト内テンプレート (template.xlsx)"
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [jsonInput, setJsonInput] = useState<string>("");
   const [isJsonValid, setIsJsonValid] = useState(false);
 
   useEffect(() => {
+    // 設定の復元
     const saved = localStorage.getItem("reportSettings");
     if (saved) setSettings(JSON.parse(saved));
+
+    // 前回出力したテンプレートの復元
+    const savedTemplate = localStorage.getItem("reportTemplate");
+    if (savedTemplate) {
+      try {
+        const parsed = JSON.parse(savedTemplate);
+        setTemplateState({
+          source: "generated",
+          name: parsed.name,
+          timestamp: parsed.timestamp,
+          dataUrl: parsed.dataUrl
+        });
+      } catch (e) {
+        console.error("Failed to parse saved template");
+      }
+    }
   }, []);
 
-  // JSON入力のリアルタイムバリデーションとデータ適用
   useEffect(() => {
     if (!jsonInput.trim()) {
       setIsJsonValid(false);
       return;
     }
-
     try {
       const parsed = JSON.parse(jsonInput);
-      
       if (parsed.progress !== undefined || Array.isArray(parsed.members)) {
         const parsedMemberProgress: Record<string, string> = {};
         if (Array.isArray(parsed.members)) {
@@ -48,7 +90,6 @@ export const useReportApp = () => {
             if (m.id) parsedMemberProgress[m.id] = m.progress || "";
           });
         }
-
         setFormattedReport({
           progress: parsed.progress || "",
           issues: parsed.issues || "",
@@ -70,11 +111,8 @@ export const useReportApp = () => {
     localStorage.setItem("reportSettings", JSON.stringify(newSettings));
   };
 
-  // 確認・修正用セクションでの更新ハンドラ
   const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress">, value: string) => {
-    if (formattedReport) {
-      setFormattedReport({ ...formattedReport, [field]: value });
-    }
+    if (formattedReport) setFormattedReport({ ...formattedReport, [field]: value });
   };
 
   const updateMemberProgress = (id: string, value: string) => {
@@ -84,6 +122,20 @@ export const useReportApp = () => {
         memberProgress: { ...formattedReport.memberProgress, [id]: value }
       });
     }
+  };
+
+  // 手動でファイルをアップロードした時の処理
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setTemplateState({ source: "uploaded", name: file.name, file });
+    }
+  };
+
+  // テンプレートを初期状態に戻す処理
+  const resetTemplate = () => {
+    localStorage.removeItem("reportTemplate");
+    setTemplateState({ source: "default", name: "プロジェクト内テンプレート (template.xlsx)" });
   };
 
   const downloadExcel = async (): Promise<boolean> => {
@@ -100,7 +152,14 @@ export const useReportApp = () => {
       const formData = new FormData();
       formData.append("settings", JSON.stringify(settings));
       formData.append("report", JSON.stringify(currentReport));
-      if (uploadedFile) formData.append("file", uploadedFile);
+      
+      // テンプレートデータの割り当て
+      if (templateState.source === "uploaded" && templateState.file) {
+        formData.append("file", templateState.file);
+      } else if (templateState.source === "generated" && templateState.dataUrl) {
+        const file = dataURLtoFile(templateState.dataUrl, templateState.name);
+        formData.append("file", file);
+      }
 
       const res = await fetch("/api/excel", { method: "POST", body: formData });
       if (!res.ok) {
@@ -110,24 +169,50 @@ export const useReportApp = () => {
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
+      const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
+      
+      // ダウンロード実行
       const a = document.createElement("a");
       a.href = url;
-      a.download = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       
-      return true; // 成功
+      // 次回用にローカルストレージへ保存する処理
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const base64data = reader.result as string;
+        const timestamp = new Date().toLocaleString("ja-JP");
+        const newState: TemplateState = {
+          source: "generated",
+          name: fileName,
+          timestamp,
+          dataUrl: base64data
+        };
+        setTemplateState(newState);
+        try {
+          localStorage.setItem("reportTemplate", JSON.stringify({
+            name: fileName,
+            timestamp,
+            dataUrl: base64data
+          }));
+        } catch(e) {
+          console.warn("ローカルストレージの容量制限に達したため、テンプレートを保存できませんでした。", e);
+        }
+      };
+      
+      return true;
     } catch (error: any) {
       alert(error.message);
-      return false; // 失敗
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
   const generateManualPrompts = () => {
-    // 編集後のデータがあればそれを優先、なければメモを使用
     const currentProgress = formattedReport?.progress || input.progressRough;
     const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
     const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || "特筆事項なし"}`).join("\n");
@@ -172,7 +257,8 @@ ${memberProgressList}
   return {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress,
-    uploadedFile, setUploadedFile, isLoading, jsonInput, setJsonInput,
+    templateState, handleFileUpload, resetTemplate,
+    isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts
   };
 };

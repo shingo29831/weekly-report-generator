@@ -1,4 +1,4 @@
-// @ai-role: Main dashboard UI implementing step-by-step workflow with inline validation and editing
+// @ai-role: Main dashboard UI implementing dynamic template persistence display and workflow
 
 "use client";
 
@@ -6,21 +6,20 @@ import { useReportApp } from "@/hooks/useReportApp";
 import { useState } from "react";
 import { Member } from "@/lib/schema";
 
-// アプリケーションの画面フロー状態を定義
 type FlowStep = "input" | "external-text" | "external-image" | "settings";
 
 export default function Home() {
   const {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress,
-    uploadedFile, setUploadedFile, isLoading, jsonInput, setJsonInput, 
+    templateState, handleFileUpload, resetTemplate,
+    isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts
   } = useReportApp();
 
   const [currentStep, setCurrentStep] = useState<FlowStep>("input");
   const prompts = generateManualPrompts();
 
-  // --- 設定関連ハンドラ ---
   const handleMemberChange = (index: number, field: keyof Member, value: string) => {
     const newMembers = [...settings.members];
     newMembers[index] = { ...newMembers[index], [field]: value };
@@ -29,24 +28,14 @@ export default function Home() {
   const addMember = () => updateSettings({ ...settings, members: [...settings.members, { id: "", name: "" }] });
   const removeMember = (index: number) => updateSettings({ ...settings, members: settings.members.filter((_, i) => i !== index) });
 
-  // --- フロー進行ハンドラ ---
-  const handleInternalGenerate = () => {
-    alert("「サイト内で生成」機能は現在準備中です。今後のアップデートをお待ちください。");
-  };
-
-  const handleExternalTextGenerate = () => {
-    setCurrentStep("external-text");
-  };
+  const handleInternalGenerate = () => alert("「サイト内で生成」機能は現在準備中です。今後のアップデートをお待ちください。");
+  const handleExternalTextGenerate = () => setCurrentStep("external-text");
 
   const handleDownloadExcelAndNext = async () => {
     const success = await downloadExcel();
-    if (success) {
-      setCurrentStep("external-image");
-      // 画像プロンプトには修正後の進捗が反映されるように再計算される
-    }
+    if (success) setCurrentStep("external-image");
   };
 
-  // --- 外部AIリンクリストコンポーネント ---
   const ExternalAILinks = () => (
     <div className="flex flex-wrap gap-2 mb-4">
       <a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" className="bg-emerald-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-emerald-700 transition-colors">ChatGPTを開く</a>
@@ -59,36 +48,64 @@ export default function Home() {
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <header className="flex justify-between items-center border-b pb-4">
         <h1 className="text-2xl font-bold">週報作成支援アプリ</h1>
-        <div className="text-sm font-medium bg-gray-100 px-3 py-1 rounded">
+        <div className="text-sm font-medium bg-gray-100 px-3 py-1 rounded border">
           {settings.groupNumber}班：{settings.theme}
         </div>
       </header>
 
-      {/* テンプレートファイル選択は全ステップで共通表示 */}
+      {/* --- 適用中のテンプレート表示セクション --- */}
       <section className="bg-blue-50 p-4 rounded-md border border-blue-100">
-        <h2 className="text-sm font-bold text-blue-800 mb-2">テンプレートファイルを選択（任意）</h2>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-sm font-bold text-blue-900">更新対象ファイル</h2>
+          {templateState.source !== "generated" && (
+            <span className="text-xs font-bold px-2 py-1 rounded bg-blue-200 text-blue-900">
+              {templateState.source === "default" && "初期テンプレート"}
+              {templateState.source === "uploaded" && "手動アップロード"}
+            </span>
+          )}
+        </div>
+        
+        <div className="bg-white p-3 rounded border border-blue-200 flex items-center justify-between mb-4 shadow-sm">
+          <div>
+            <p className="font-bold text-gray-800 text-sm">{templateState.name}</p>
+            {templateState.timestamp && (
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-xs text-gray-500">出力日時: {templateState.timestamp}</p>
+                {templateState.source === "generated" && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                    前回出力したファイル
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          {templateState.source !== "default" && (
+            <button onClick={resetTemplate} className="text-xs text-red-600 hover:text-red-800 font-bold px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded transition-colors">
+              初期状態に戻す
+            </button>
+          )}
+        </div>
+
+        <label className="text-xs font-bold text-gray-600 mb-1 block">別のファイルで上書きする</label>
         <input
           type="file" accept=".xlsx"
-          onChange={(e) => setUploadedFile(e.target.files?.[0] || null)}
-          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-white file:text-blue-700 hover:file:bg-blue-50"
+          onChange={handleFileUpload}
+          className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-white file:text-blue-700 hover:file:bg-blue-100 transition-colors cursor-pointer"
         />
       </section>
 
-      {/* ヘッダーナビゲーション */}
       <nav className="flex space-x-4 border-b">
         <button onClick={() => setCurrentStep("input")} className={`py-2 px-4 ${currentStep === "input" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>報告メモ入力</button>
         <button onClick={() => setCurrentStep("settings")} className={`py-2 px-4 ${currentStep === "settings" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>班・メンバー設定</button>
       </nav>
 
-      {/* =========================================
-          ステップ1: 報告メモ入力と生成手段の選択
-      ========================================= */}
+      {/* STEP 1 */}
       {currentStep === "input" && (
         <section className="space-y-6 animate-in fade-in">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">今週の進捗（メモ書き）</label>
-              <textarea className="w-full border rounded p-3 text-sm h-40" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} placeholder="今週実施したことを箇条書きで..." />
+              <textarea className="w-full border rounded p-3 text-sm h-40" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} placeholder="個人からチームまで実施したことを適当に記入..." />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1 text-gray-700">課題・困りごと（メモ書き）</label>
@@ -118,9 +135,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* =========================================
-          ステップ2: 外部AI(テキスト)生成と確認・修正
-      ========================================= */}
+      {/* STEP 2 */}
       {currentStep === "external-text" && (
         <section className="space-y-8 animate-in slide-in-from-right-4">
           <div className="bg-gray-50 p-6 rounded-lg border">
@@ -143,7 +158,6 @@ export default function Home() {
             />
           </div>
 
-          {/* 確認用セクション（JSONが有効な場合のみ表示） */}
           {isJsonValid && formattedReport && (
             <div className="bg-white p-6 rounded-lg border-2 border-indigo-100 shadow-md animate-in fade-in">
               <h3 className="text-lg font-bold mb-4 text-indigo-900 border-b pb-2">STEP 3: 内容の確認と修正</h3>
@@ -192,13 +206,11 @@ export default function Home() {
         </section>
       )}
 
-      {/* =========================================
-          ステップ3: 画像(図解)の生成
-      ========================================= */}
+      {/* STEP 3 */}
       {currentStep === "external-image" && (
         <section className="space-y-8 animate-in slide-in-from-right-4">
           <div className="bg-green-50 p-4 rounded border border-green-200 text-green-800 font-bold flex items-center gap-2">
-            <span>✓ Excelファイルの出力が完了しました。</span>
+            <span>✓ Excelファイルの出力と、テンプレートの自動保存が完了しました。</span>
           </div>
 
           <div className="bg-gray-50 p-6 rounded-lg border">
@@ -220,9 +232,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* =========================================
-          環境設定タブ
-      ========================================= */}
+      {/* 環境設定タブ */}
       {currentStep === "settings" && (
         <section className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
