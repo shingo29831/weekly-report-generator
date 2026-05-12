@@ -245,7 +245,7 @@ ${memberProgressList || "特筆事項なし"}
 
     const imagePrompt = `# 依頼概要
 あなたは専門学校の卒業研究支援AIです。
-以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成してください。
+以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成し画像出力してください。
 ファイル名: 週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週
 
 テーマ: ${settings.theme}
