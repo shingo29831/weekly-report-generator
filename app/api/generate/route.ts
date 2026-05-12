@@ -1,5 +1,5 @@
 // @ai-role: API route to handle Excel generation requests and return file blobs
-// Node.jsのBuffer型と標準Fetch APIのBodyInit型の互換性エラーを回避するため型アサーションを使用
+// HTTPヘッダーの制約（ASCII文字のみ）を回避するため、ファイル名をURLエンコードしてContent-Dispositionに設定
 
 import { NextResponse } from "next/server";
 import { generateExcelFile } from "@/lib/excelHelper";
@@ -18,11 +18,15 @@ export async function POST(req: Request) {
 
     const excelBuffer = await generateExcelFile(buffer, settings, report);
     
-    // Buffer型をBodyInitとして安全にキャスト
+    // 日本語ファイル名をHTTPヘッダーで安全に送信するためのエンコード処理
+    const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
+    const encodedFileName = encodeURIComponent(fileName);
+
     return new NextResponse(excelBuffer as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx"`,
+        // filename* を使用してUTF-8のエンコード済み文字列をブラウザに解釈させる（フォールバックとして filename="report.xlsx" を指定）
+        "Content-Disposition": `attachment; filename="report.xlsx"; filename*=UTF-8''${encodedFileName}`,
       },
     });
   } catch (error: any) {
