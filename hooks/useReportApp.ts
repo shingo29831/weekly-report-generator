@@ -1,4 +1,4 @@
-// @ai-role: custom hook managing state, local storage, and real-time JSON validation
+// @ai-role: custom hook managing state, real-time validation, and workflow state updates
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
@@ -41,7 +41,6 @@ export const useReportApp = () => {
     try {
       const parsed = JSON.parse(jsonInput);
       
-      // 必須キーの簡易チェック
       if (parsed.progress !== undefined || Array.isArray(parsed.members)) {
         const parsedMemberProgress: Record<string, string> = {};
         if (Array.isArray(parsed.members)) {
@@ -71,28 +70,23 @@ export const useReportApp = () => {
     localStorage.setItem("reportSettings", JSON.stringify(newSettings));
   };
 
-  const generateWithAPI = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetchWithRetry("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input, settings }),
-      });
-      const data = await res.json();
-      setFormattedReport(data.result);
-      // API経由で取得した場合はJSON入力欄も更新して同期をとる
-      setJsonInput(JSON.stringify(data.result, null, 2));
-      alert("AI推論が完了しました。");
-    } catch (error) {
-      alert("AI推論に失敗しました。");
-    } finally {
-      setIsLoading(false);
+  // 確認・修正用セクションでの更新ハンドラ
+  const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress">, value: string) => {
+    if (formattedReport) {
+      setFormattedReport({ ...formattedReport, [field]: value });
     }
   };
 
-  const downloadExcel = async () => {
-    // formattedReport（最新の有効なJSONまたはAPI結果）を優先的に使用
+  const updateMemberProgress = (id: string, value: string) => {
+    if (formattedReport) {
+      setFormattedReport({
+        ...formattedReport,
+        memberProgress: { ...formattedReport.memberProgress, [id]: value }
+      });
+    }
+  };
+
+  const downloadExcel = async (): Promise<boolean> => {
     const currentReport = formattedReport || {
       progress: input.progressRough,
       issues: input.issuesRough,
@@ -122,14 +116,18 @@ export const useReportApp = () => {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
+      
+      return true; // 成功
     } catch (error: any) {
       alert(error.message);
+      return false; // 失敗
     } finally {
       setIsLoading(false);
     }
   };
 
   const generateManualPrompts = () => {
+    // 編集後のデータがあればそれを優先、なければメモを使用
     const currentProgress = formattedReport?.progress || input.progressRough;
     const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
     const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || "特筆事項なし"}`).join("\n");
@@ -162,7 +160,7 @@ ${memberProgressList}
 
     const imagePrompt = `# 依頼概要
 あなたは専門学校の卒業研究支援AIです。
-以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成してください。
+以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成し画像出力してください。
 ファイル名: 週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週
 
 テーマ: ${settings.theme}
@@ -173,7 +171,8 @@ ${memberProgressList}
 
   return {
     settings, updateSettings, input, setInput, formattedReport,
+    updateFormattedReportField, updateMemberProgress,
     uploadedFile, setUploadedFile, isLoading, jsonInput, setJsonInput,
-    isJsonValid, generateWithAPI, downloadExcel, generateManualPrompts
+    isJsonValid, downloadExcel, generateManualPrompts
   };
 };
