@@ -1,9 +1,7 @@
-// @ai-role: server-side logic for manipulating Excel files with explicit sheet cloning and custom styling
+// @ai-role: server-side logic for manipulating Excel files, compatible with Edge runtime (no fs/path)
 
 import ExcelJS from "exceljs";
 import { format, startOfWeek, endOfWeek } from "date-fns";
-import fs from "fs";
-import path from "path";
 import { Settings, FormattedReport } from "./schema";
 
 const applyInputStyle = (cell: ExcelJS.Cell) => {
@@ -33,19 +31,11 @@ export const generateExcelFile = async (
 ): Promise<Buffer> => {
   const workbook = new ExcelJS.Workbook();
 
+  // Cloudflare対応: サーバーサイドでのファイル直接読み込み(fs)を廃止。常にクライアントからBufferを受け取る。
   if (baseFileBuffer) {
     await workbook.xlsx.load(baseFileBuffer);
   } else {
-    const publicPath = path.join(process.cwd(), "public", "template.xlsx");
-    const rootPath = path.join(process.cwd(), "template.xlsx");
-    
-    if (fs.existsSync(publicPath)) {
-      await workbook.xlsx.readFile(publicPath);
-    } else if (fs.existsSync(rootPath)) {
-      await workbook.xlsx.readFile(rootPath);
-    } else {
-      throw new Error("テンプレートファイルが見つかりません。");
-    }
+    throw new Error("テンプレートデータが提供されていません。");
   }
 
   const templateSheet = workbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
@@ -53,7 +43,6 @@ export const generateExcelFile = async (
 
   const start = startOfWeek(targetDate, { weekStartsOn: 1 });
   const end = endOfWeek(targetDate, { weekStartsOn: 1 });
-  // シート名を「mmdd週」に変更
   const sheetName = `${format(start, "MMdd")}週`;
 
   let targetSheet = workbook.getWorksheet(sheetName);
@@ -67,7 +56,10 @@ export const generateExcelFile = async (
     templateSheet.columns.forEach((col, index) => {
       const newCol = targetSheet!.getColumn(index + 1);
       newCol.width = col.width;
-      newCol.style = col.style;
+      // 型エラー修正: undefined の場合は代入しない
+      if (col.style) {
+        newCol.style = col.style;
+      }
     });
 
     templateSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
@@ -76,7 +68,10 @@ export const generateExcelFile = async (
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         const newCell = newRow.getCell(colNumber);
         newCell.value = cell.value;
-        newCell.style = cell.style;
+        // 型エラー修正: undefined の場合は代入しない
+        if (cell.style) {
+          newCell.style = cell.style;
+        }
       });
     });
 

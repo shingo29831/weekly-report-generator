@@ -1,7 +1,8 @@
-// @ai-role: custom hook managing state, local storage, real-time validation, and template persistence
+// @ai-role: custom hook managing state, real-time validation, and template persistence (Edge compatible)
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
+import { fetchWithRetry } from "@/lib/apiClient";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -39,12 +40,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 export const useReportApp = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [input, setInput] = useState<ReportInput>({ 
-    freeMemo: "", 
-    progressRough: "", 
-    issuesRough: "", 
-    memberProgressRough: {} 
-  });
+  const [input, setInput] = useState<ReportInput>({ freeMemo: "", progressRough: "", issuesRough: "", memberProgressRough: {} });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
   
   const [templateState, setTemplateState] = useState<TemplateState>({
@@ -151,11 +147,18 @@ export const useReportApp = () => {
       formData.append("settings", JSON.stringify(settings));
       formData.append("report", JSON.stringify(currentReport));
       
+      // テンプレートの付与ロジック（Cloudflare/Edge対応）
       if (templateState.source === "uploaded" && templateState.file) {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
         formData.append("file", file);
+      } else if (templateState.source === "default") {
+        // フロントエンドからpublicフォルダ内のテンプレートをフェッチして渡す
+        const res = await fetch("/template.xlsx");
+        if (!res.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。publicディレクトリに template.xlsx を配置してください。");
+        const blob = await res.blob();
+        formData.append("file", blob, "template.xlsx");
       }
 
       const res = await fetch("/api/excel", { method: "POST", body: formData });
@@ -208,7 +211,6 @@ export const useReportApp = () => {
   };
 
   const generateManualPrompts = () => {
-    // 画像プロンプト用には、テキスト生成結果があればそれを優先、なければ自由記述か進捗メモを使用
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
     const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
     const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || ""}`).filter(line => !line.endsWith(": ")).join("\n");
