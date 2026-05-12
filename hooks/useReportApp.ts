@@ -13,7 +13,7 @@ export interface TemplateState {
 
 // 個人情報を含まない一般的な初期データ
 const DEFAULT_SETTINGS: Settings = {
-  groupNumber: "1",
+  groupNumber: "0",
   theme: "AIタスク管理アプリ",
   themeDetails: "ユーザーの入力に基づいてAIが自動でタスクの優先度を判定し、スケジュールを最適化するWebアプリケーションの開発。",
   members: [
