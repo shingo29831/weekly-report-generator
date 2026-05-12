@@ -17,14 +17,16 @@ export async function POST(req: Request) {
 
     const excelBuffer = await generateExcelFile(buffer, settings, report);
     
-    return new NextResponse(excelBuffer, {
+    // HTTPヘッダーの制約エラーを確実に防ぐため、ヘッダーにはASCII文字（半角英数字）のみを使用します。
+    // ※ 実際のダウンロード時の日本語ファイル名は、フロントエンド側（useReportApp.tsのa.download）で指定されるため問題ありません。
+    return new NextResponse(excelBuffer as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx"`,
+        "Content-Disposition": `attachment; filename="weekly_report.xlsx"`,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Excel Generation Error:", error);
-    return NextResponse.json({ error: "Failed to generate Excel file" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to generate Excel file" }, { status: 500 });
   }
 }
