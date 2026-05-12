@@ -1,4 +1,4 @@
-// @ai-role: custom hook managing state and business flows with external AI integration logic
+// @ai-role: custom hook managing state, local storage, and real-time JSON validation
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
@@ -24,11 +24,47 @@ export const useReportApp = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [jsonInput, setJsonInput] = useState<string>("");
+  const [isJsonValid, setIsJsonValid] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("reportSettings");
     if (saved) setSettings(JSON.parse(saved));
   }, []);
+
+  // JSON入力のリアルタイムバリデーションとデータ適用
+  useEffect(() => {
+    if (!jsonInput.trim()) {
+      setIsJsonValid(false);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(jsonInput);
+      
+      // 必須キーの簡易チェック
+      if (parsed.progress !== undefined || Array.isArray(parsed.members)) {
+        const parsedMemberProgress: Record<string, string> = {};
+        if (Array.isArray(parsed.members)) {
+          parsed.members.forEach((m: any) => {
+            if (m.id) parsedMemberProgress[m.id] = m.progress || "";
+          });
+        }
+
+        setFormattedReport({
+          progress: parsed.progress || "",
+          issues: parsed.issues || "",
+          nextWeek: parsed.nextWeek || "",
+          trouble: parsed.trouble || "",
+          memberProgress: parsedMemberProgress,
+        });
+        setIsJsonValid(true);
+      } else {
+        setIsJsonValid(false);
+      }
+    } catch (e) {
+      setIsJsonValid(false);
+    }
+  }, [jsonInput]);
 
   const updateSettings = (newSettings: Settings) => {
     setSettings(newSettings);
@@ -45,6 +81,8 @@ export const useReportApp = () => {
       });
       const data = await res.json();
       setFormattedReport(data.result);
+      // API経由で取得した場合はJSON入力欄も更新して同期をとる
+      setJsonInput(JSON.stringify(data.result, null, 2));
       alert("AI推論が完了しました。");
     } catch (error) {
       alert("AI推論に失敗しました。");
@@ -54,6 +92,7 @@ export const useReportApp = () => {
   };
 
   const downloadExcel = async () => {
+    // formattedReport（最新の有効なJSONまたはAPI結果）を優先的に使用
     const currentReport = formattedReport || {
       progress: input.progressRough,
       issues: input.issuesRough,
@@ -132,29 +171,9 @@ ${memberProgressList}
     return { jsonPrompt, imagePrompt };
   };
 
-  const handleJsonImport = () => {
-    try {
-      const parsed = JSON.parse(jsonInput);
-      const parsedMemberProgress: Record<string, string> = {};
-      if (Array.isArray(parsed.members)) {
-        parsed.members.forEach((m: any) => { parsedMemberProgress[m.id] = m.progress; });
-      }
-      setFormattedReport({
-        progress: parsed.progress || "",
-        issues: parsed.issues || "",
-        nextWeek: parsed.nextWeek || "",
-        trouble: parsed.trouble || "",
-        memberProgress: parsedMemberProgress,
-      });
-      alert("JSON読み込み完了");
-    } catch (error) {
-      alert("JSONの形式が正しくありません。");
-    }
-  };
-
   return {
     settings, updateSettings, input, setInput, formattedReport,
     uploadedFile, setUploadedFile, isLoading, jsonInput, setJsonInput,
-    generateWithAPI, downloadExcel, generateManualPrompts, handleJsonImport
+    isJsonValid, generateWithAPI, downloadExcel, generateManualPrompts
   };
 };
