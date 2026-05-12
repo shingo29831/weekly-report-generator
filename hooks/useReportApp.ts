@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
-import { fetchWithRetry } from "@/lib/apiClient";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -12,16 +11,15 @@ export interface TemplateState {
   file?: File;
 }
 
+// 個人情報を含まない一般的な初期データ
 const DEFAULT_SETTINGS: Settings = {
-  groupNumber: "4",
-  theme: "マクロ最適化AI",
-  themeDetails: "ユーザーが専門知識がなくても最適なマクロ生成できるようにするためAIに作業を理解させ、最適化されたマクロを生成する。",
+  groupNumber: "1",
+  theme: "AIタスク管理アプリ",
+  themeDetails: "ユーザーの入力に基づいてAIが自動でタスクの優先度を判定し、スケジュールを最適化するWebアプリケーションの開発。",
   members: [
-    { id: "8", name: "梅田 真吾" },
-    { id: "9", name: "大津 幸輝" },
-    { id: "13", name: "蟹江 りゅうた" },
-    { id: "31", name: "林 楓也" },
-    { id: "43", name: "吉田 誠司" },
+    { id: "1", name: "情報 太郎" },
+    { id: "2", name: "技術 花子" },
+    { id: "3", name: "開発 次郎" }
   ],
 };
 
@@ -40,7 +38,12 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 export const useReportApp = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [input, setInput] = useState<ReportInput>({ freeMemo: "", progressRough: "", issuesRough: "", memberProgressRough: {} });
+  const [input, setInput] = useState<ReportInput>({ 
+    freeMemo: "", 
+    progressRough: "", 
+    issuesRough: "", 
+    memberProgressRough: {} 
+  });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
   
   const [templateState, setTemplateState] = useState<TemplateState>({
@@ -147,14 +150,12 @@ export const useReportApp = () => {
       formData.append("settings", JSON.stringify(settings));
       formData.append("report", JSON.stringify(currentReport));
       
-      // テンプレートの付与ロジック（Cloudflare/Edge対応）
       if (templateState.source === "uploaded" && templateState.file) {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
         formData.append("file", file);
       } else if (templateState.source === "default") {
-        // フロントエンドからpublicフォルダ内のテンプレートをフェッチして渡す
         const res = await fetch("/template.xlsx");
         if (!res.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。publicディレクトリに template.xlsx を配置してください。");
         const blob = await res.blob();
@@ -244,7 +245,7 @@ ${memberProgressList || "特筆事項なし"}
 
     const imagePrompt = `# 依頼概要
 あなたは専門学校の卒業研究支援AIです。
-以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成し画像出力してください。
+以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成してください。
 ファイル名: 週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週
 
 テーマ: ${settings.theme}
