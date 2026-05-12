@@ -1,27 +1,32 @@
-// @ai-role: API route for server-side AI text generation and formatting
+// @ai-role: API route to handle Excel generation requests and return file blobs
+// Node.jsのBuffer型と標準Fetch APIのBodyInit型の互換性エラーを回避するため型アサーションを使用
 
 import { NextResponse } from "next/server";
-import { reportInputSchema, settingsSchema } from "@/lib/schema";
+import { generateExcelFile } from "@/lib/excelHelper";
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const input = reportInputSchema.parse(body.input);
-    const settings = settingsSchema.parse(body.settings);
+    const formData = await req.formData();
+    const settings = JSON.parse(formData.get("settings") as string);
+    const report = JSON.parse(formData.get("report") as string);
+    const file = formData.get("file") as File | null;
 
-    // AI logic placeholder - replace with actual OpenAI/Gemini SDK call
-    // For now, structuring a mock return. In reality, pass the system prompt and structured input to the LLM.
-    const mockGeneratedContent = {
-      progress: `【${settings.theme}】に関する進捗: ${input.progressRough}の整理を完了しました。`,
-      issues: input.issuesRough,
-      nextWeek: "次回のタスクを計画通り実行する。",
-      trouble: "特になし",
-      memberProgress: input.memberProgressRough,
-    };
+    let buffer = null;
+    if (file) {
+      buffer = await file.arrayBuffer();
+    }
 
-    return NextResponse.json({ result: mockGeneratedContent });
-  } catch (error) {
-    console.error("AI Generation Error:", error);
-    return NextResponse.json({ error: "Failed to generate report" }, { status: 500 });
+    const excelBuffer = await generateExcelFile(buffer, settings, report);
+    
+    // Buffer型をBodyInitとして安全にキャスト
+    return new NextResponse(excelBuffer as unknown as BodyInit, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx"`,
+      },
+    });
+  } catch (error: any) {
+    console.error("Excel Generation Error:", error);
+    return NextResponse.json({ error: error.message || "Failed to generate Excel file" }, { status: 500 });
   }
 }

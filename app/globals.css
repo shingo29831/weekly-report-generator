@@ -1,0 +1,5 @@
+/* @ai-role: global CSS file containing Tailwind directives */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
