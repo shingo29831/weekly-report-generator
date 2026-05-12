@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 // @ai-role: API route to handle Excel generation requests and return file blobs
 
 import { NextResponse } from "next/server";

@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 // @ai-role: API route to handle Excel generation requests and return file blobs
 // HTTPヘッダーの制約（ASCII文字のみ）を回避するため、ファイル名をURLエンコードしてContent-Dispositionに設定
 
