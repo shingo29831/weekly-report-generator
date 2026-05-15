@@ -214,7 +214,11 @@ export const useReportApp = () => {
   const generateManualPrompts = () => {
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
     const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
-    const memberProgressList = settings.members.map(m => `- ${m.name} (${m.id}): ${input.memberProgressRough[m.id] || ""}`).filter(line => !line.endsWith(": ")).join("\n");
+    // 生成済みの結果があればそれを優先し、なければ元の入力を使う
+    const memberProgressList = settings.members.map(m => {
+      const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
+      return `- ${m.name} (${m.id}): ${progress}`;
+    }).filter(line => !line.endsWith(": ")).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
 
@@ -243,15 +247,66 @@ ${memberProgressList || "特筆事項なし"}
   "members": [ { "id": "...", "name": "...", "progress": "..." } ]
 }`;
 
+    const imageFileName = `週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週`;
+
     const imagePrompt = `# 依頼概要
+
 あなたは専門学校の卒業研究支援AIです。
-以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成し画像出力してください。
-ファイル名: 週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週
+
+以下の週報情報をもとに、「他班や教員が一目で理解できる週次進捗ボード」を作成し画像で出力してください。
+
+キャラクター的表現、雑談調、ロールプレイ、演出表現は禁止。
+
+客観的かつ整理された資料として出力してください。
+ 
+# 出力条件
+
+・A3横向き1枚相当
+・情報整理重視
+・派手な装飾は禁止
+・ビジネス資料風
+・背景は白
+・色数は少なめ
+・進捗と課題がすぐ判別できる構成
+・前週との差分が分かるようにする
+・文章を減らし、要点を整理
+・読みやすさ最優先
+ 
+# レイアウト
+
+左側：【班全体の進捗概要】
+右上：【現在の課題・問題点】
+右中央：【来週やること】
+右下：【メンバー別進捗】
+ 
+# 強調したいこと
+
+・進捗停滞
+・問題点
+・役割分担
+・前週との差分
+
+※特に前週との差分、進捗停滞、新しく発生した問題を強調してください。
+ 
+# 禁止事項
+
+・アニメ風
+・ゲーム風
+・過剰演出
+・意味のない装飾
+・長文
+・イラスト主体
+ 
+# 週報データ
 
 テーマ: ${settings.theme}
-今週の進捗: ${currentProgress}`;
+今週の進捗: ${currentProgress}
+今週の課題: ${formattedReport?.issues || input.issuesRough || "特筆事項なし"}
 
-    return { jsonPrompt, imagePrompt };
+各メンバーの個別進捗:
+${memberProgressList || "特筆事項なし"}`;
+
+    return { jsonPrompt, imagePrompt, imageFileName };
   };
 
   return {

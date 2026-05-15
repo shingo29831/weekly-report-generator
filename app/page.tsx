@@ -246,6 +246,20 @@ export default function Home() {
               出力された内容をもとに、画像を生成するためのプロンプトです。AIサイトで画像を生成し、保存してください。
             </p>
             <ExternalAILinks />
+
+            {/* 画像ファイル名のコピー機能 */}
+            <div className="mt-4 p-3 bg-white border border-gray-200 rounded shadow-sm flex justify-between items-center">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">画像保存時の推奨ファイル名</label>
+                <code className="text-sm font-mono text-indigo-900 bg-indigo-50 px-2 py-1 rounded">{prompts.imageFileName}</code>
+              </div>
+              <button 
+                onClick={() => { navigator.clipboard.writeText(prompts.imageFileName); alert("ファイル名をコピーしました"); }} 
+                className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1.5 px-3 rounded transition-colors"
+              >
+                コピー
+              </button>
+            </div>
             
             <textarea readOnly className="w-full border rounded p-2 mt-4 text-sm font-mono bg-white h-40" value={prompts.imagePrompt} />
             <button onClick={() => { navigator.clipboard.writeText(prompts.imagePrompt); alert("画像生成用プロンプトをコピーしました"); }} className="w-full mt-2 bg-gray-800 text-white text-sm py-3 rounded font-bold hover:bg-black transition-colors">
