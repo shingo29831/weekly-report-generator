@@ -28,10 +28,10 @@ export const generateExcelFile = async (
   settings: Settings,
   report: FormattedReport,
   targetDate: Date = new Date()
-): Promise<Buffer> => {
+): Promise<ArrayBuffer> => {
   const workbook = new ExcelJS.Workbook();
 
-  // Cloudflare対応: サーバーサイドでのファイル直接読み込み(fs)を廃止。常にクライアントからBufferを受け取る。
+  // Edge runtime compatibility: Avoid fs operations
   if (baseFileBuffer) {
     await workbook.xlsx.load(baseFileBuffer);
   } else {
@@ -56,7 +56,6 @@ export const generateExcelFile = async (
     templateSheet.columns.forEach((col, index) => {
       const newCol = targetSheet!.getColumn(index + 1);
       newCol.width = col.width;
-      // 型エラー修正: undefined の場合は代入しない
       if (col.style) {
         newCol.style = col.style;
       }
@@ -68,7 +67,6 @@ export const generateExcelFile = async (
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         const newCell = newRow.getCell(colNumber);
         newCell.value = cell.value;
-        // 型エラー修正: undefined の場合は代入しない
         if (cell.style) {
           newCell.style = cell.style;
         }
@@ -121,5 +119,6 @@ export const generateExcelFile = async (
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  return Buffer.from(buffer);
+  // Return as ArrayBuffer instead of Node.js Buffer to prevent crashes in Edge
+  return buffer as ArrayBuffer;
 };

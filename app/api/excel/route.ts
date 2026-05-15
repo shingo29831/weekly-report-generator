@@ -3,12 +3,30 @@ export const runtime = 'edge';
 
 import { NextResponse } from "next/server";
 import { generateExcelFile } from "@/lib/excelHelper";
+import { settingsSchema } from "@/lib/schema";
+import { z } from "zod";
+
+const formattedReportSchema = z.object({
+  progress: z.string(),
+  issues: z.string(),
+  nextWeek: z.string(),
+  trouble: z.string(),
+  memberProgress: z.record(z.string(), z.string()),
+});
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
-    const settings = JSON.parse(formData.get("settings") as string);
-    const report = JSON.parse(formData.get("report") as string);
+    const settingsStr = formData.get("settings");
+    const reportStr = formData.get("report");
+    
+    if (!settingsStr || !reportStr) {
+      return NextResponse.json({ error: "Required fields are missing" }, { status: 400 });
+    }
+
+    // Input validation
+    const settings = settingsSchema.parse(JSON.parse(settingsStr as string));
+    const report = formattedReportSchema.parse(JSON.parse(reportStr as string));
     const file = formData.get("file") as File | null;
 
     let buffer = null;
@@ -18,9 +36,7 @@ export async function POST(req: Request) {
 
     const excelBuffer = await generateExcelFile(buffer, settings, report);
     
-    // HTTPヘッダーの制約エラーを確実に防ぐため、ヘッダーにはASCII文字（半角英数字）のみを使用します。
-    // ※ 実際のダウンロード時の日本語ファイル名は、フロントエンド側（useReportApp.tsのa.download）で指定されるため問題ありません。
-    return new NextResponse(excelBuffer as unknown as BodyInit, {
+    return new NextResponse(excelBuffer, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="weekly_report.xlsx"`,
