@@ -18,7 +18,17 @@ export default function Home() {
   } = useReportApp();
 
   const [currentStep, setCurrentStep] = useState<FlowStep>("input");
+  const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({});
   const prompts = generateManualPrompts();
+
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedStates((prev) => ({ ...prev, [key]: true }));
+    // 頻繁な操作を阻害しないよう、一定時間で表示を元に戻す
+    setTimeout(() => {
+      setCopiedStates((prev) => ({ ...prev, [key]: false }));
+    }, 2000);
+  };
 
   const handleMemberChange = (index: number, field: keyof Member, value: string) => {
     const newMembers = [...settings.members];
@@ -169,7 +179,12 @@ export default function Home() {
             <h3 className="text-lg font-bold mb-4">STEP 1: プロンプトをコピーしてAIに入力する</h3>
             <ExternalAILinks />
             <textarea readOnly className="w-full border rounded p-2 mt-2 text-xs font-mono bg-white h-32" value={prompts.jsonPrompt} />
-            <button onClick={() => { navigator.clipboard.writeText(prompts.jsonPrompt); alert("プロンプトをコピーしました"); }} className="w-full mt-2 bg-gray-800 text-white text-sm py-2 rounded font-bold hover:bg-black transition-colors">プロンプトをコピー</button>
+            <button 
+              onClick={() => handleCopy(prompts.jsonPrompt, "jsonPrompt")} 
+              className="w-full mt-2 bg-gray-800 text-white text-sm py-2 rounded font-bold hover:bg-black transition-colors"
+            >
+              {copiedStates["jsonPrompt"] ? "コピーしました" : "プロンプトをコピー"}
+            </button>
           </div>
 
           <div className="bg-white p-6 rounded-lg border shadow-sm">
@@ -254,16 +269,19 @@ export default function Home() {
                 <code className="text-sm font-mono text-indigo-900 bg-indigo-50 px-2 py-1 rounded">{prompts.imageFileName}</code>
               </div>
               <button 
-                onClick={() => { navigator.clipboard.writeText(prompts.imageFileName); alert("ファイル名をコピーしました"); }} 
+                onClick={() => handleCopy(prompts.imageFileName, "imageFileName")} 
                 className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-1.5 px-3 rounded transition-colors"
               >
-                コピー
+                {copiedStates["imageFileName"] ? "コピーしました" : "コピー"}
               </button>
             </div>
             
             <textarea readOnly className="w-full border rounded p-2 mt-4 text-sm font-mono bg-white h-40" value={prompts.imagePrompt} />
-            <button onClick={() => { navigator.clipboard.writeText(prompts.imagePrompt); alert("画像生成用プロンプトをコピーしました"); }} className="w-full mt-2 bg-gray-800 text-white text-sm py-3 rounded font-bold hover:bg-black transition-colors">
-              画像生成用プロンプトをコピー
+            <button 
+              onClick={() => handleCopy(prompts.imagePrompt, "imagePrompt")} 
+              className="w-full mt-2 bg-gray-800 text-white text-sm py-3 rounded font-bold hover:bg-black transition-colors"
+            >
+              {copiedStates["imagePrompt"] ? "コピーしました" : "画像生成用プロンプトをコピー"}
             </button>
           </div>
 
