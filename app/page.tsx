@@ -14,7 +14,8 @@ export default function Home() {
     updateFormattedReportField, updateMemberProgress,
     templateState, handleFileUpload, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
-    isJsonValid, downloadExcel, generateManualPrompts
+    isJsonValid, downloadExcel, generateManualPrompts,
+    importSettingsFromExcel
   } = useReportApp();
 
   const [currentStep, setCurrentStep] = useState<FlowStep>("input");
@@ -24,10 +25,19 @@ export default function Home() {
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedStates((prev) => ({ ...prev, [key]: true }));
-    // 頻繁な操作を阻害しないよう、一定時間で表示を元に戻す
     setTimeout(() => {
       setCopiedStates((prev) => ({ ...prev, [key]: false }));
     }, 2000);
+  };
+
+  const handleImport = async () => {
+    const success = await importSettingsFromExcel();
+    if (success) {
+      setCopiedStates((prev) => ({ ...prev, "import": true }));
+      setTimeout(() => {
+        setCopiedStates((prev) => ({ ...prev, "import": false }));
+      }, 2000);
+    }
   };
 
   const handleMemberChange = (index: number, field: keyof Member, value: string) => {
@@ -113,7 +123,6 @@ export default function Home() {
       {currentStep === "input" && (
         <section className="space-y-6 animate-in fade-in">
           
-          {/* 追加：自由記述メモ枠 */}
           <div className="bg-white p-5 rounded-lg border shadow-sm">
             <label className="block text-base font-bold mb-2 text-indigo-900">
               📝 今週の活動メモ（何でも自由に記述）
@@ -130,7 +139,6 @@ export default function Home() {
             />
           </div>
 
-          {/* 既存の入力欄（アコーディオン化） */}
           <details className="group bg-gray-50 p-4 rounded border cursor-pointer">
             <summary className="font-bold text-sm text-gray-700 list-none flex justify-between items-center">
               <span>さらに詳細に分けて入力する（任意・必要な場合のみ）</span>
@@ -262,7 +270,6 @@ export default function Home() {
             </p>
             <ExternalAILinks />
 
-            {/* 画像ファイル名のコピー機能 */}
             <div className="mt-4 p-3 bg-white border border-gray-200 rounded shadow-sm flex justify-between items-center">
               <div>
                 <label className="block text-xs font-bold text-gray-500 mb-1">画像保存時の推奨ファイル名</label>
@@ -294,6 +301,20 @@ export default function Home() {
       {/* 環境設定タブ */}
       {currentStep === "settings" && (
         <section className="space-y-6">
+          <div className="bg-blue-50 p-4 rounded border border-blue-200 flex items-center justify-between">
+            <div className="text-sm text-blue-900">
+              <p className="font-bold">自動読み込み</p>
+              <p className="text-xs">アップロード済みファイルの「0420週」シートからメンバー構成を読み取ります。</p>
+            </div>
+            <button 
+              onClick={handleImport}
+              disabled={isLoading}
+              className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm disabled:bg-blue-300"
+            >
+              {isLoading ? "読込中..." : copiedStates["import"] ? "設定しました" : "ファイルから参照し設定する"}
+            </button>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div><label className="text-sm font-bold">班番号</label><input className="w-full border rounded p-2 mt-1" value={settings.groupNumber} onChange={(e) => updateSettings({ ...settings, groupNumber: e.target.value })} /></div>
             <div><label className="text-sm font-bold">テーマ</label><input className="w-full border rounded p-2 mt-1" value={settings.theme} onChange={(e) => updateSettings({ ...settings, theme: e.target.value })} /></div>

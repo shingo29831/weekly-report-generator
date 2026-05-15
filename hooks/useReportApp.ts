@@ -1,7 +1,8 @@
 // @ai-role: custom hook managing state, real-time validation, and template persistence (Edge compatible)
 
 import { useState, useEffect } from "react";
-import { Settings, ReportInput, FormattedReport } from "@/lib/schema";
+import { Settings, ReportInput, FormattedReport, Member } from "@/lib/schema";
+import ExcelJS from "exceljs";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -133,6 +134,55 @@ export const useReportApp = () => {
   const resetTemplate = () => {
     localStorage.removeItem("reportTemplate");
     setTemplateState({ source: "default", name: "プロジェクト内テンプレート (template.xlsx)" });
+  };
+
+  const importSettingsFromExcel = async () => {
+    setIsLoading(true);
+    try {
+      let buffer: ArrayBuffer;
+      if (templateState.source === "uploaded" && templateState.file) {
+        buffer = await templateState.file.arrayBuffer();
+      } else if (templateState.source === "generated" && templateState.dataUrl) {
+        const file = dataURLtoFile(templateState.dataUrl, templateState.name);
+        buffer = await file.arrayBuffer();
+      } else {
+        const res = await fetch("/template.xlsx");
+        if (!res.ok) throw new Error("基準となるファイルが見つかりません。");
+        buffer = await res.arrayBuffer();
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+
+      // 特定のシート「0420週」を優先的に探し、なければ「ひな形」または最初のシートを使用
+      const sheet = workbook.getWorksheet("0420週") || 
+                    workbook.worksheets.find(s => s.name.includes("ひな形")) || 
+                    workbook.worksheets[0];
+
+      if (!sheet) throw new Error("有効なワークシートが見つかりません。");
+
+      const newMembers: Member[] = [];
+      // テンプレートの仕様に基づき、16行目から21行目のB列(ID)とC列(名前)を読み取る
+      for (let row = 16; row <= 21; row++) {
+        const id = sheet.getCell(`B${row}`).value?.toString().trim() || "";
+        const name = sheet.getCell(`C${row}`).value?.toString().trim() || "";
+        if (id || name) {
+          newMembers.push({ id, name });
+        }
+      }
+
+      if (newMembers.length > 0) {
+        updateSettings({ ...settings, members: newMembers });
+        return true;
+      } else {
+        throw new Error("指定されたセル（B16:C21）にメンバー情報が見つかりませんでした。");
+      }
+    } catch (error: any) {
+      alert(`読み込みエラー: ${error.message}`);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const downloadExcel = async (): Promise<boolean> => {
@@ -314,6 +364,7 @@ ${memberProgressList || "特筆事項なし"}`;
     updateFormattedReportField, updateMemberProgress,
     templateState, handleFileUpload, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
-    isJsonValid, downloadExcel, generateManualPrompts
+    isJsonValid, downloadExcel, generateManualPrompts,
+    importSettingsFromExcel
   };
 };
