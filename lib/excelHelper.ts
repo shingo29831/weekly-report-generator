@@ -23,7 +23,7 @@ const applyInputStyle = (cell: ExcelJS.Cell) => {
   };
 };
 
-// 異なるワークブック間やシート間でスタイル・構造を完全に複製するためのヘルパー
+// 異なるワークブックやシート間でスタイル・構造を複製
 const copySheetStructure = (srcSheet: ExcelJS.Worksheet, destSheet: ExcelJS.Worksheet) => {
   destSheet.properties = srcSheet.properties;
   destSheet.pageSetup = srcSheet.pageSetup;
@@ -78,7 +78,7 @@ export const generateExcelFile = async (
 
   let templateSheet = workbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
 
-  // 提出ファイルにひな形がない場合、先頭にひな形を挿入した状態の新ワークブックへ再構成する
+  // 提出ファイルにひな形がない場合、先頭にひな形を挿入した状態の新ワークブックへ再構成
   if (!templateSheet) {
     const defaultTemplateSheet = defaultWorkbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
     if (!defaultTemplateSheet) throw new Error("デフォルトの「ひな形」シートが見つかりません。");
@@ -152,7 +152,7 @@ export const generateExcelFile = async (
     row++;
   }
 
-  // アップロードされた週報画像をJ8セル（インデックスベースでcol:9, row:7）の基準位置に固定配置
+  // J8セル (col:9, row:7 に相当) を起点として画像を挿入
   if (imageBuffer) {
     const imageId = workbook.addImage({
       buffer: imageBuffer,

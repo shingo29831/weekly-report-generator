@@ -119,9 +119,16 @@ export default function Home() {
         <section className="space-y-6 animate-in fade-in">
           
           <div className="bg-white p-5 rounded-lg border shadow-sm">
-            <label className="block text-base font-bold mb-2 text-indigo-900">
-              📝 今週の活動メモ（何でも自由に記述）
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-base font-bold text-indigo-900">
+                📝 今週の活動メモ（何でも自由に記述）
+              </label>
+              {prompts.pastReportsContext && (
+                <span className="text-xs font-bold text-blue-700 bg-blue-100 px-2 py-1 rounded">
+                  ✓ 過去の週報データを参照中
+                </span>
+              )}
+            </div>
             <p className="text-xs text-gray-500 mb-3">
               誰が何をやったか、困ったことなど、思いつくままに箇条書きで適当に書いてください。<br/>
               （例: 〇〇さんがUI設計した。API連携でエラーが出て困っている。来週はDB構築する等）
@@ -134,20 +141,24 @@ export default function Home() {
             />
           </div>
 
-          <details className="group bg-gray-50 p-4 rounded border cursor-pointer">
+          <details className="group bg-gray-50 p-4 rounded border cursor-pointer" open>
             <summary className="font-bold text-sm text-gray-700 list-none flex justify-between items-center">
               <span>さらに詳細に分けて入力する（任意・必要な場合のみ）</span>
               <span className="transition group-open:rotate-180">▼</span>
             </summary>
             <div className="pt-6 mt-4 border-t border-gray-200 cursor-default space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">チーム全体の進捗</label>
-                  <textarea className="w-full border rounded p-3 text-sm h-32" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} />
+                  <label className="block text-sm font-medium mb-1 text-gray-700">進捗・差分</label>
+                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="完了・進行中・未着手など" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-gray-700">課題・困りごと</label>
-                  <textarea className="w-full border rounded p-3 text-sm h-32" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} />
+                  <label className="block text-sm font-medium mb-1 text-gray-700">問題・リスク</label>
+                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="発生した問題・影響範囲など" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-gray-700">来週やること</label>
+                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="次の具体的なアクション" value={input.nextWeekRough || ""} onChange={(e) => setInput({ ...input, nextWeekRough: e.target.value })} />
                 </div>
               </div>
               <div>
@@ -155,9 +166,9 @@ export default function Home() {
                 <div className="grid gap-2">
                   {settings.members.map((m) => (
                     <div key={m.id} className="flex items-center gap-4 bg-white p-2 rounded border">
-                      <span className="w-32 text-xs font-bold text-gray-600 truncate">{m.name}</span>
-                      <input className="w-32 border rounded p-2 text-sm bg-white" placeholder="今週の担当" value={input.memberRolesRough?.[m.id] || ""} onChange={(e) => setInput({ ...input, memberRolesRough: { ...input.memberRolesRough, [m.id]: e.target.value } })} />
-                      <input className="flex-1 border rounded p-2 text-sm bg-white" placeholder="個別の担当作業があれば..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
+                      <span className="w-24 text-xs font-bold text-gray-600 truncate">{m.name}</span>
+                      <input className="w-32 border rounded p-2 text-xs bg-white" placeholder="今週の担当" value={input.memberRolesRough?.[m.id] || ""} onChange={(e) => setInput({ ...input, memberRolesRough: { ...input.memberRolesRough, [m.id]: e.target.value } })} />
+                      <input className="flex-1 border rounded p-2 text-xs bg-white" placeholder="進捗（完了/進行中）・差分・問題・次やること等..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
                     </div>
                   ))}
                 </div>
@@ -211,15 +222,15 @@ export default function Home() {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-bold mb-1">チーム全体としての今週の進捗</label>
+                  <label className="block text-sm font-bold mb-1">チーム全体としての今週の進捗（差分）</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={3} value={formattedReport.progress} onChange={(e) => updateFormattedReportField("progress", e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-1">今週の課題</label>
+                  <label className="block text-sm font-bold mb-1">今週の課題（問題・リスク）</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.issues} onChange={(e) => updateFormattedReportField("issues", e.target.value)} />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold mb-1">来週やること</label>
+                  <label className="block text-sm font-bold mb-1">来週やること（次のアクション）</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.nextWeek} onChange={(e) => updateFormattedReportField("nextWeek", e.target.value)} />
                 </div>
                 <div>
@@ -240,7 +251,7 @@ export default function Home() {
                           </div>
                           <div className="flex items-start gap-2">
                             <span className="text-xs text-gray-500 w-20 pt-2">進捗内容:</span>
-                            <textarea className="flex-1 border rounded p-2 text-sm bg-white" rows={2} value={formattedReport.memberProgress[m.id] || ""} onChange={(e) => updateMemberProgress(m.id, e.target.value)} />
+                            <textarea className="flex-1 border rounded p-2 text-sm bg-white" rows={3} value={formattedReport.memberProgress[m.id] || ""} onChange={(e) => updateMemberProgress(m.id, e.target.value)} />
                           </div>
                         </div>
                       </div>
@@ -248,7 +259,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Excel出力の実行を画像生成確認の後に変更 */}
                 <button 
                   onClick={() => setCurrentStep("external-image")} 
                   className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 font-bold py-4 rounded text-white shadow-lg transition-all text-lg"
@@ -293,7 +303,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* 週報画像アップロード枠 */}
           <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
             <h3 className="text-lg font-bold text-gray-800">STEP 5: 週報画像の選択（任意）</h3>
             <p className="text-sm text-gray-600">

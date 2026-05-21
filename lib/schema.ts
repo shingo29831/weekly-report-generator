@@ -19,6 +19,7 @@ export const reportInputSchema = z.object({
   freeMemo: z.string().optional(),
   progressRough: z.string(),
   issuesRough: z.string(),
+  nextWeekRough: z.string().optional(),
   memberProgressRough: z.record(z.string(), z.string()),
   memberRolesRough: z.record(z.string(), z.string()).optional(),
 });

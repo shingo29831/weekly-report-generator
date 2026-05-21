@@ -42,11 +42,13 @@ export const useReportApp = () => {
     freeMemo: "", 
     progressRough: "", 
     issuesRough: "", 
+    nextWeekRough: "",
     memberProgressRough: {},
     memberRolesRough: {}
   });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
   const [reportImage, setReportImage] = useState<File | null>(null);
+  const [pastReportsContext, setPastReportsContext] = useState<string>("");
   
   const [templateState, setTemplateState] = useState<TemplateState>({
     source: "default",
@@ -76,6 +78,81 @@ export const useReportApp = () => {
       }
     }
   }, []);
+
+  // テンプレート更新時に過去3週分のデータを抽出してAIコンテキストとして保持する
+  useEffect(() => {
+    extractPastReports(templateState);
+  }, [templateState]);
+
+  const extractPastReports = async (source: TemplateState) => {
+    try {
+      let buffer: ArrayBuffer;
+      if (source.source === "uploaded" && source.file) {
+        buffer = await source.file.arrayBuffer();
+      } else if (source.source === "generated" && source.dataUrl) {
+        const file = dataURLtoFile(source.dataUrl, source.name);
+        buffer = await file.arrayBuffer();
+      } else {
+        const res = await fetch("/template.xlsx");
+        if (!res.ok) return;
+        buffer = await res.arrayBuffer();
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(buffer);
+
+      const pastReports = [];
+      
+      for (const sheet of workbook.worksheets) {
+        if (sheet.name.includes("ひな形")) continue;
+        
+        const progress = sheet.getCell("B8").value?.toString() || "";
+        const issuesAndNext = sheet.getCell("B11").value?.toString() || "";
+        const dateRange = `${sheet.getCell("F2").value?.toString() || ""} 〜 ${sheet.getCell("H2").value?.toString() || ""}`;
+        
+        let dateVal = 0;
+        const f2Val = sheet.getCell("F2").value;
+        if (f2Val instanceof Date) {
+          dateVal = f2Val.getTime();
+        } else if (typeof f2Val === "string") {
+          const parsedDate = new Date(f2Val);
+          if (!isNaN(parsedDate.getTime())) dateVal = parsedDate.getTime();
+        }
+        if (dateVal === 0) dateVal = sheet.id; // フォールバック
+
+        let memberProgress = "";
+        for (let row = 16; row <= 21; row++) {
+          const name = sheet.getCell(`C${row}`).value?.toString() || "";
+          const prog = sheet.getCell(`D${row}`).value?.toString() || "";
+          if (name && prog) {
+            memberProgress += `- ${name}: ${prog}\n`;
+          }
+        }
+
+        pastReports.push({ sheetName: sheet.name, dateRange, dateVal, progress, issuesAndNext, memberProgress });
+      }
+
+      pastReports.sort((a, b) => b.dateVal - a.dateVal);
+      const recent3 = pastReports.slice(0, 3);
+      
+      let contextStr = "";
+      if (recent3.length > 0) {
+        contextStr = "【過去のデータ（新しい順）】※差分の識別に利用してください\n";
+        recent3.forEach((report, index) => {
+          contextStr += `--- 前回から ${index + 1} つ前のデータ ---\n`;
+          contextStr += `シート名・期間: ${report.sheetName} (${report.dateRange})\n`;
+          contextStr += `チーム進捗:\n${report.progress}\n`;
+          contextStr += `チーム課題・次やること:\n${report.issuesAndNext}\n`;
+          contextStr += `メンバー別進捗:\n${report.memberProgress}\n\n`;
+        });
+      }
+      
+      setPastReportsContext(contextStr);
+    } catch (error) {
+      console.error("過去レポートの抽出に失敗しました", error);
+      setPastReportsContext("");
+    }
+  };
 
   useEffect(() => {
     if (!jsonInput.trim()) {
@@ -211,7 +288,7 @@ export const useReportApp = () => {
     const currentReport: FormattedReport = formattedReport || {
       progress: input.progressRough,
       issues: input.issuesRough,
-      nextWeek: "",
+      nextWeek: input.nextWeekRough || "",
       trouble: "",
       memberProgress: input.memberProgressRough,
       memberRoles: input.memberRolesRough || {},
@@ -306,28 +383,38 @@ export const useReportApp = () => {
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
 
+【先生からの要求事項（週報で必ず満たすこと）】
+以下の要素を各項目に必ず盛り込んでください。
+・進捗（完了した作業、進行中の作業、未着手の作業）
+・差分（過去のデータから、新しくやったこと、終わったこと、変わってないこと）
+・問題、リスク（発生した問題、つまりそうなリスク、影響範囲(やばさ)。※問題がない場合は順調な理由などを記載）
+・次のアクション（誰が何をどこまでやるか。※タスクは具体的で終わりが見えるように）
+
 【チーム構成とテーマ】
 テーマ: ${settings.theme}
 テーマ詳細: ${settings.themeDetails}
 メンバーリスト:
 ${memberListContext}
 
-【入力情報】
+${pastReportsContext}
+
+【今回の入力情報】
 自由記述メモ（全体）: ${input.freeMemo || "特筆事項なし"}
 チーム全体の進捗メモ（詳細）: ${input.progressRough || "特筆事項なし"}
-チーム全体の課題・困りごとメモ（詳細）: ${input.issuesRough || "特筆事項なし"}
-各メンバーの個別進捗メモ（詳細）:
+チーム全体の問題・リスクメモ（詳細）: ${input.issuesRough || "特筆事項なし"}
+チーム全体の来週やることメモ（詳細）: ${input.nextWeekRough || "特筆事項なし"}
+各メンバーの個別メモ（進捗、差分、問題、次やること）:
 ${memberProgressList || "特筆事項なし"}
 
 【推論要件】
-1. 情報の統合と振り分け: 「自由記述メモ」や「各詳細メモ」の内容を総合的に分析してください。特定の個人の作業や成果と判明したものは個人の報告（members[].progress）に振り分け、それ以外の全体概要を「progress」に記載してください。
+1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. JSONテキストのみを出力すること。
 
 {
-  "progress": "チーム全体の概要",
-  "issues": "今週の課題",
-  "nextWeek": "来週やること",
-  "trouble": "今週一番困ってること",
+  "progress": "チーム全体の進捗と差分",
+  "issues": "今週の課題とリスク",
+  "nextWeek": "来週やること（次のアクション）",
+  "trouble": "今週一番困ってること（影響範囲）",
   "members": [ { "id": "...", "name": "...", "role": "今週の一時的な担当(判明した場合のみ)", "progress": "..." } ]
 }`;
 
@@ -360,7 +447,7 @@ ${memberProgressList || "特筆事項なし"}
 
 左側：【班全体の進捗概要】
 右上：【現在の課題・問題点】
-right中央：【来週やること】
+右中央：【来週やること】
 右下：【メンバー別進捗】
  
 # 強調したいこと
@@ -375,10 +462,8 @@ right中央：【来週やること】
 # 禁止事項
 
 ・アニメ風
-// ・ゲーム風
 ・過剰演出
 ・意味のない装飾
-// ・長文
 ・イラスト主体
  
 # 週報データ
@@ -386,11 +471,12 @@ right中央：【来週やること】
 テーマ: ${settings.theme}
 今週の進捗: ${currentProgress}
 今週の課題: ${formattedReport?.issues || input.issuesRough || "特筆事項なし"}
+来週やること: ${formattedReport?.nextWeek || input.nextWeekRough || "特筆事項なし"}
 
 各メンバーの個別進捗:
 ${memberProgressList || "特筆事項なし"}`;
 
-    return { jsonPrompt, imagePrompt, imageFileName };
+    return { jsonPrompt, imagePrompt, imageFileName, pastReportsContext };
   };
 
   return {
