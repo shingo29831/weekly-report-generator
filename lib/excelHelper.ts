@@ -1,7 +1,7 @@
 // @ai-role: server-side logic for manipulating Excel files, compatible with Edge runtime (no fs/path)
 
 import ExcelJS from "exceljs";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfWeek, addDays } from "date-fns";
 import { Settings, FormattedReport } from "./schema";
 
 const applyInputStyle = (cell: ExcelJS.Cell) => {
@@ -96,8 +96,9 @@ export const generateExcelFile = async (
     workbook = orderedWorkbook;
   }
 
+  // 週の初め（月曜日）と、週の終わり（月曜日から4日後の金曜日）を計算
   const start = startOfWeek(targetDate, { weekStartsOn: 1 });
-  const end = endOfWeek(targetDate, { weekStartsOn: 1 });
+  const end = addDays(start, 4);
   const sheetName = `${format(start, "MMdd")}週`;
 
   let targetSheet = workbook.getWorksheet(sheetName);
