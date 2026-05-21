@@ -161,7 +161,7 @@ export const generateExcelFile = async (
     });
     targetSheet.addImage(imageId, {
       tl: { col: 9, row: 7 },
-      ext: { width: 640, height: 452 }
+      ext: { width: 840, height: 594 } // 画像サイズを見やすく大きくし、見切れないサイズに調整
     });
   }
 
