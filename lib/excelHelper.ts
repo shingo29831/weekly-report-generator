@@ -23,11 +23,47 @@ const applyInputStyle = (cell: ExcelJS.Cell) => {
   };
 };
 
+// 異なるワークブック間やシート間でスタイル・構造を完全に複製するためのヘルパー
+const copySheetStructure = (srcSheet: ExcelJS.Worksheet, destSheet: ExcelJS.Worksheet) => {
+  destSheet.properties = srcSheet.properties;
+  destSheet.pageSetup = srcSheet.pageSetup;
+  destSheet.views = srcSheet.views;
+
+  srcSheet.columns.forEach((col, index) => {
+    const newCol = destSheet.getColumn(index + 1);
+    newCol.width = col.width;
+    if (col.style) {
+      newCol.style = col.style;
+    }
+  });
+
+  srcSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    const newRow = destSheet.getRow(rowNumber);
+    newRow.height = row.height;
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      const newCell = newRow.getCell(colNumber);
+      newCell.value = cell.value;
+      if (cell.style) {
+        newCell.style = cell.style;
+      }
+    });
+  });
+
+  const merges = (srcSheet.model as any).merges;
+  if (merges && Array.isArray(merges)) {
+    merges.forEach((merge: string) => {
+      destSheet.mergeCells(merge);
+    });
+  }
+};
+
 export const generateExcelFile = async (
   baseFileBuffer: ArrayBuffer | null,
   defaultTemplateBuffer: ArrayBuffer,
   settings: Settings,
   report: FormattedReport,
+  imageBuffer: ArrayBuffer | null,
+  imageExtension: string | null,
   targetDate: Date = new Date()
 ): Promise<ArrayBuffer> => {
   let workbook = new ExcelJS.Workbook();
@@ -41,42 +77,23 @@ export const generateExcelFile = async (
   }
 
   let templateSheet = workbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
+
+  // 提出ファイルにひな形がない場合、先頭にひな形を挿入した状態の新ワークブックへ再構成する
   if (!templateSheet) {
     const defaultTemplateSheet = defaultWorkbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
     if (!defaultTemplateSheet) throw new Error("デフォルトの「ひな形」シートが見つかりません。");
 
-    templateSheet = workbook.addWorksheet("ひな形");
-    
-    templateSheet.properties = defaultTemplateSheet.properties;
-    templateSheet.pageSetup = defaultTemplateSheet.pageSetup;
-    templateSheet.views = defaultTemplateSheet.views;
+    const orderedWorkbook = new ExcelJS.Workbook();
+    const newTemplateSheet = orderedWorkbook.addWorksheet("ひな形");
+    copySheetStructure(defaultTemplateSheet, newTemplateSheet);
+    templateSheet = newTemplateSheet;
 
-    defaultTemplateSheet.columns.forEach((col, index) => {
-      const newCol = templateSheet!.getColumn(index + 1);
-      newCol.width = col.width;
-      if (col.style) {
-        newCol.style = col.style;
-      }
+    workbook.worksheets.forEach(sheet => {
+      const newSheet = orderedWorkbook.addWorksheet(sheet.name);
+      copySheetStructure(sheet, newSheet);
     });
 
-    defaultTemplateSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      const newRow = templateSheet!.getRow(rowNumber);
-      newRow.height = row.height;
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const newCell = newRow.getCell(colNumber);
-        newCell.value = cell.value;
-        if (cell.style) {
-          newCell.style = cell.style;
-        }
-      });
-    });
-
-    const merges = (defaultTemplateSheet.model as any).merges;
-    if (merges && Array.isArray(merges)) {
-      merges.forEach((merge: string) => {
-        templateSheet!.mergeCells(merge);
-      });
-    }
+    workbook = orderedWorkbook;
   }
 
   const start = startOfWeek(targetDate, { weekStartsOn: 1 });
@@ -86,37 +103,7 @@ export const generateExcelFile = async (
   let targetSheet = workbook.getWorksheet(sheetName);
   if (!targetSheet) {
     targetSheet = workbook.addWorksheet(sheetName);
-    
-    targetSheet.properties = templateSheet.properties;
-    targetSheet.pageSetup = templateSheet.pageSetup;
-    targetSheet.views = templateSheet.views;
-
-    templateSheet.columns.forEach((col, index) => {
-      const newCol = targetSheet!.getColumn(index + 1);
-      newCol.width = col.width;
-      if (col.style) {
-        newCol.style = col.style;
-      }
-    });
-
-    templateSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
-      const newRow = targetSheet!.getRow(rowNumber);
-      newRow.height = row.height;
-      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-        const newCell = newRow.getCell(colNumber);
-        newCell.value = cell.value;
-        if (cell.style) {
-          newCell.style = cell.style;
-        }
-      });
-    });
-
-    const merges = (templateSheet.model as any).merges;
-    if (merges && Array.isArray(merges)) {
-      merges.forEach((merge: string) => {
-        targetSheet!.mergeCells(merge);
-      });
-    }
+    copySheetStructure(templateSheet, targetSheet);
   }
 
   const cellB2 = targetSheet.getCell("B2");
@@ -163,6 +150,18 @@ export const generateExcelFile = async (
     cellProgress.value = progressValue;
     applyInputStyle(cellProgress);
     row++;
+  }
+
+  // アップロードされた週報画像をJ8セル（インデックスベースでcol:9, row:7）の基準位置に固定配置
+  if (imageBuffer) {
+    const imageId = workbook.addImage({
+      buffer: imageBuffer,
+      extension: (imageExtension || 'png') as any,
+    });
+    targetSheet.addImage(imageId, {
+      tl: { col: 9, row: 7 },
+      ext: { width: 640, height: 452 }
+    });
   }
 
   const buffer = await workbook.xlsx.writeBuffer();

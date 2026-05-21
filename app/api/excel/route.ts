@@ -29,6 +29,7 @@ export async function POST(req: Request) {
     const report = formattedReportSchema.parse(JSON.parse(reportStr as string));
     const file = formData.get("file") as File | null;
     const defaultTemplateFile = formData.get("defaultTemplate") as File | null;
+    const imageFile = formData.get("image") as File | null;
 
     let buffer = null;
     if (file) {
@@ -42,7 +43,15 @@ export async function POST(req: Request) {
       throw new Error("Default template is missing in request.");
     }
 
-    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report);
+    let imageBuffer = null;
+    let imageExtension = null;
+    if (imageFile) {
+      imageBuffer = await imageFile.arrayBuffer();
+      const ext = imageFile.name.split('.').pop();
+      imageExtension = ext ? ext.toLowerCase() : 'png';
+    }
+
+    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension);
     
     return new NextResponse(excelBuffer, {
       headers: {

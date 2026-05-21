@@ -38,7 +38,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 export const useReportApp = () => {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [input, setInput] = useState<ReportInput>({ 
+  const [input, setInput] = useState<ReportInput>( { 
     freeMemo: "", 
     progressRough: "", 
     issuesRough: "", 
@@ -46,6 +46,7 @@ export const useReportApp = () => {
     memberRolesRough: {}
   });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
+  const [reportImage, setReportImage] = useState<File | null>(null);
   
   const [templateState, setTemplateState] = useState<TemplateState>({
     source: "default",
@@ -147,6 +148,13 @@ export const useReportApp = () => {
     }
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setReportImage(file);
+    }
+  };
+
   const resetTemplate = () => {
     localStorage.removeItem("reportTemplate");
     setTemplateState({ source: "default", name: "プロジェクト内テンプレート (template.xlsx)" });
@@ -186,7 +194,6 @@ export const useReportApp = () => {
       }
 
       if (newMembers.length > 0) {
-        // インポート時は既存の role を維持しつつマージする処理にしても良いが、今回は上書き
         updateSettings({ ...settings, members: newMembers });
         return true;
       } else {
@@ -217,7 +224,7 @@ export const useReportApp = () => {
       formData.append("report", JSON.stringify(currentReport));
       
       const defaultRes = await fetch("/template.xlsx");
-      if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。publicディレクトリに template.xlsx を配置してください。");
+      if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。");
       const defaultBlob = await defaultRes.blob();
       formData.append("defaultTemplate", defaultBlob, "template.xlsx");
 
@@ -228,6 +235,10 @@ export const useReportApp = () => {
         formData.append("file", file);
       } else if (templateState.source === "default") {
         formData.append("file", defaultBlob, "template.xlsx");
+      }
+
+      if (reportImage) {
+        formData.append("image", reportImage);
       }
 
       const res = await fetch("/api/excel", { method: "POST", body: formData });
@@ -349,7 +360,7 @@ ${memberProgressList || "特筆事項なし"}
 
 左側：【班全体の進捗概要】
 右上：【現在の課題・問題点】
-右中央：【来週やること】
+right中央：【来週やること】
 右下：【メンバー別進捗】
  
 # 強調したいこと
@@ -364,10 +375,10 @@ ${memberProgressList || "特筆事項なし"}
 # 禁止事項
 
 ・アニメ風
-・ゲーム風
+// ・ゲーム風
 ・過剰演出
 ・意味のない装飾
-・長文
+// ・長文
 ・イラスト主体
  
 # 週報データ
@@ -385,7 +396,7 @@ ${memberProgressList || "特筆事項なし"}`;
   return {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress, updateMemberRole,
-    templateState, handleFileUpload, resetTemplate,
+    templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
     importSettingsFromExcel

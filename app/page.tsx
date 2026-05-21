@@ -12,7 +12,7 @@ export default function Home() {
   const {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress, updateMemberRole,
-    templateState, handleFileUpload, resetTemplate,
+    templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
     importSettingsFromExcel
@@ -50,11 +50,6 @@ export default function Home() {
 
   const handleInternalGenerate = () => alert("「サイト内で生成」機能は現在準備中です。今後のアップデートをお待ちください。");
   const handleExternalTextGenerate = () => setCurrentStep("external-text");
-
-  const handleDownloadExcelAndNext = async () => {
-    const success = await downloadExcel();
-    if (success) setCurrentStep("external-image");
-  };
 
   const ExternalAILinks = () => (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -181,7 +176,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* STEP 2 */}
+      {/* STEP 2: AIテキスト確認・編集 */}
       {currentStep === "external-text" && (
         <section className="space-y-8 animate-in slide-in-from-right-4">
           <div className="bg-gray-50 p-6 rounded-lg border">
@@ -253,12 +248,12 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Excel出力の実行を画像生成確認の後に変更 */}
                 <button 
-                  onClick={handleDownloadExcelAndNext} 
-                  disabled={isLoading}
-                  className="w-full mt-6 bg-green-600 hover:bg-green-700 font-bold py-4 rounded text-white shadow-lg transition-all text-lg"
+                  onClick={() => setCurrentStep("external-image")} 
+                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 font-bold py-4 rounded text-white shadow-lg transition-all text-lg"
                 >
-                  {isLoading ? "Excelファイル出力中..." : "修正内容を適用してExcelを出力し、次へ"}
+                  修正内容を確定して画像生成・出力ページへ
                 </button>
               </div>
             </div>
@@ -266,13 +261,9 @@ export default function Home() {
         </section>
       )}
 
-      {/* STEP 3 */}
+      {/* STEP 3: 画像生成・画像アップロード・Excel最終出力 */}
       {currentStep === "external-image" && (
         <section className="space-y-8 animate-in slide-in-from-right-4">
-          <div className="bg-green-50 p-4 rounded border border-green-200 text-green-800 font-bold flex items-center gap-2">
-            <span>✓ Excelファイルの出力と、テンプレートの自動保存が完了しました。</span>
-          </div>
-
           <div className="bg-gray-50 p-6 rounded-lg border">
             <h3 className="text-lg font-bold mb-4">STEP 4: 週報図解（画像）の作成</h3>
             <p className="text-sm text-gray-600 mb-4">
@@ -302,8 +293,32 @@ export default function Home() {
             </button>
           </div>
 
+          {/* 週報画像アップロード枠 */}
+          <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+            <h3 className="text-lg font-bold text-gray-800">STEP 5: 週報画像の選択（任意）</h3>
+            <p className="text-sm text-gray-600">
+              生成した週報画像を以下からアップロードしてください。Excelの「J8」セルへ自動的に貼り付けられます。画像を貼らない場合はそのまま進んでください。
+            </p>
+            <input
+              type="file" accept="image/*"
+              onChange={handleImageUpload}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-colors cursor-pointer"
+            />
+            {reportImage && (
+              <p className="text-sm font-bold text-green-600">✓ 適用画像: {reportImage.name}</p>
+            )}
+          </div>
+
+          <button 
+            onClick={downloadExcel} 
+            disabled={isLoading}
+            className="w-full bg-green-600 hover:bg-green-700 font-bold py-4 rounded text-white shadow-lg transition-all text-lg"
+          >
+            {isLoading ? "Excelファイル出力中..." : reportImage ? "画像を適用して最終Excelを出力する" : "画像なしでExcelを出力する"}
+          </button>
+
           <button onClick={() => setCurrentStep("input")} className="w-full bg-gray-200 text-gray-800 font-bold py-3 rounded hover:bg-gray-300">
-            最初に戻る
+            戻る
           </button>
         </section>
       )}
