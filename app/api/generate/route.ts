@@ -11,22 +11,28 @@ export async function POST(req: Request) {
     const settings = JSON.parse(formData.get("settings") as string);
     const report = JSON.parse(formData.get("report") as string);
     const file = formData.get("file") as File | null;
+    const defaultTemplateFile = formData.get("defaultTemplate") as File | null;
 
     let buffer = null;
     if (file) {
       buffer = await file.arrayBuffer();
     }
 
-    const excelBuffer = await generateExcelFile(buffer, settings, report);
+    let defaultBuffer = null;
+    if (defaultTemplateFile) {
+      defaultBuffer = await defaultTemplateFile.arrayBuffer();
+    } else {
+      throw new Error("Default template is missing in request.");
+    }
+
+    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report);
     
-    // 日本語ファイル名をHTTPヘッダーで安全に送信するためのエンコード処理
     const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
     const encodedFileName = encodeURIComponent(fileName);
 
     return new NextResponse(excelBuffer as unknown as BodyInit, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        // filename* を使用してUTF-8のエンコード済み文字列をブラウザに解釈させる（フォールバックとして filename="report.xlsx" を指定）
         "Content-Disposition": `attachment; filename="report.xlsx"; filename*=UTF-8''${encodedFileName}`,
       },
     });

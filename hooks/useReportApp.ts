@@ -12,15 +12,14 @@ export interface TemplateState {
   file?: File;
 }
 
-// 個人情報を含まない一般的な初期データ
 const DEFAULT_SETTINGS: Settings = {
   groupNumber: "0",
   theme: "AIタスク管理アプリ",
   themeDetails: "ユーザーの入力に基づいてAIが自動でタスクの優先度を判定し、スケジュールを最適化するWebアプリケーションの開発。",
   members: [
-    { id: "1", name: "情報 太郎" },
-    { id: "2", name: "技術 花子" },
-    { id: "3", name: "開発 次郎" }
+    { id: "1", name: "情報 太郎", role: "UI設計" },
+    { id: "2", name: "技術 花子", role: "API連携" },
+    { id: "3", name: "開発 次郎", role: "DB構築" }
   ],
 };
 
@@ -43,7 +42,8 @@ export const useReportApp = () => {
     freeMemo: "", 
     progressRough: "", 
     issuesRough: "", 
-    memberProgressRough: {} 
+    memberProgressRough: {},
+    memberRolesRough: {}
   });
   const [formattedReport, setFormattedReport] = useState<FormattedReport | null>(null);
   
@@ -85,9 +85,15 @@ export const useReportApp = () => {
       const parsed = JSON.parse(jsonInput);
       if (parsed.progress !== undefined || Array.isArray(parsed.members)) {
         const parsedMemberProgress: Record<string, string> = {};
+        const parsedMemberRoles: Record<string, string> = {};
         if (Array.isArray(parsed.members)) {
           parsed.members.forEach((m: any) => {
-            if (m.id) parsedMemberProgress[m.id] = m.progress || "";
+            if (m.id) {
+              parsedMemberProgress[m.id] = m.progress || "";
+              if (m.role) {
+                parsedMemberRoles[m.id] = m.role;
+              }
+            }
           });
         }
         setFormattedReport({
@@ -96,6 +102,7 @@ export const useReportApp = () => {
           nextWeek: parsed.nextWeek || "",
           trouble: parsed.trouble || "",
           memberProgress: parsedMemberProgress,
+          memberRoles: parsedMemberRoles,
         });
         setIsJsonValid(true);
       } else {
@@ -111,7 +118,7 @@ export const useReportApp = () => {
     localStorage.setItem("reportSettings", JSON.stringify(newSettings));
   };
 
-  const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress">, value: string) => {
+  const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress" | "memberRoles">, value: string) => {
     if (formattedReport) setFormattedReport({ ...formattedReport, [field]: value });
   };
 
@@ -120,6 +127,15 @@ export const useReportApp = () => {
       setFormattedReport({
         ...formattedReport,
         memberProgress: { ...formattedReport.memberProgress, [id]: value }
+      });
+    }
+  };
+
+  const updateMemberRole = (id: string, value: string) => {
+    if (formattedReport) {
+      setFormattedReport({
+        ...formattedReport,
+        memberRoles: { ...formattedReport.memberRoles, [id]: value }
       });
     }
   };
@@ -154,7 +170,6 @@ export const useReportApp = () => {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);
 
-      // 特定のシート「0420週」を優先的に探し、なければ「ひな形」または最初のシートを使用
       const sheet = workbook.getWorksheet("0420週") || 
                     workbook.worksheets.find(s => s.name.includes("ひな形")) || 
                     workbook.worksheets[0];
@@ -162,7 +177,6 @@ export const useReportApp = () => {
       if (!sheet) throw new Error("有効なワークシートが見つかりません。");
 
       const newMembers: Member[] = [];
-      // テンプレートの仕様に基づき、16行目から21行目のB列(ID)とC列(名前)を読み取る
       for (let row = 16; row <= 21; row++) {
         const id = sheet.getCell(`B${row}`).value?.toString().trim() || "";
         const name = sheet.getCell(`C${row}`).value?.toString().trim() || "";
@@ -172,6 +186,7 @@ export const useReportApp = () => {
       }
 
       if (newMembers.length > 0) {
+        // インポート時は既存の role を維持しつつマージする処理にしても良いが、今回は上書き
         updateSettings({ ...settings, members: newMembers });
         return true;
       } else {
@@ -186,12 +201,13 @@ export const useReportApp = () => {
   };
 
   const downloadExcel = async (): Promise<boolean> => {
-    const currentReport = formattedReport || {
+    const currentReport: FormattedReport = formattedReport || {
       progress: input.progressRough,
       issues: input.issuesRough,
       nextWeek: "",
       trouble: "",
       memberProgress: input.memberProgressRough,
+      memberRoles: input.memberRolesRough || {},
     };
 
     setIsLoading(true);
@@ -200,16 +216,18 @@ export const useReportApp = () => {
       formData.append("settings", JSON.stringify(settings));
       formData.append("report", JSON.stringify(currentReport));
       
+      const defaultRes = await fetch("/template.xlsx");
+      if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。publicディレクトリに template.xlsx を配置してください。");
+      const defaultBlob = await defaultRes.blob();
+      formData.append("defaultTemplate", defaultBlob, "template.xlsx");
+
       if (templateState.source === "uploaded" && templateState.file) {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
         formData.append("file", file);
       } else if (templateState.source === "default") {
-        const res = await fetch("/template.xlsx");
-        if (!res.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。publicディレクトリに template.xlsx を配置してください。");
-        const blob = await res.blob();
-        formData.append("file", blob, "template.xlsx");
+        formData.append("file", defaultBlob, "template.xlsx");
       }
 
       const res = await fetch("/api/excel", { method: "POST", body: formData });
@@ -263,11 +281,16 @@ export const useReportApp = () => {
 
   const generateManualPrompts = () => {
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
-    const memberListContext = settings.members.map(m => `- ${m.name} (出席番号: ${m.id})`).join("\n");
-    // 生成済みの結果があればそれを優先し、なければ元の入力を使う
+    const memberListContext = settings.members.map(m => {
+      const roleText = m.role ? ` (デフォルト担当: ${m.role})` : "";
+      return `- ${m.name} (出席番号: ${m.id})${roleText}`;
+    }).join("\n");
+    
     const memberProgressList = settings.members.map(m => {
       const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
-      return `- ${m.name} (${m.id}): ${progress}`;
+      const tempRole = formattedReport?.memberRoles?.[m.id] || input.memberRolesRough?.[m.id] || "";
+      const roleText = tempRole ? ` (一時的な担当: ${tempRole})` : "";
+      return `- ${m.name} (${m.id})${roleText}: ${progress}`;
     }).filter(line => !line.endsWith(": ")).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
@@ -294,7 +317,7 @@ ${memberProgressList || "特筆事項なし"}
   "issues": "今週の課題",
   "nextWeek": "来週やること",
   "trouble": "今週一番困ってること",
-  "members": [ { "id": "...", "name": "...", "progress": "..." } ]
+  "members": [ { "id": "...", "name": "...", "role": "今週の一時的な担当(判明した場合のみ)", "progress": "..." } ]
 }`;
 
     const imageFileName = `週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週`;
@@ -361,7 +384,7 @@ ${memberProgressList || "特筆事項なし"}`;
 
   return {
     settings, updateSettings, input, setInput, formattedReport,
-    updateFormattedReportField, updateMemberProgress,
+    updateFormattedReportField, updateMemberProgress, updateMemberRole,
     templateState, handleFileUpload, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,

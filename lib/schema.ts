@@ -5,6 +5,7 @@ import { z } from "zod";
 export const memberSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
+  role: z.string().optional(),
 });
 
 export const settingsSchema = z.object({
@@ -15,10 +16,11 @@ export const settingsSchema = z.object({
 });
 
 export const reportInputSchema = z.object({
-  freeMemo: z.string().optional(), // 自由記述メモを追加
+  freeMemo: z.string().optional(),
   progressRough: z.string(),
   issuesRough: z.string(),
   memberProgressRough: z.record(z.string(), z.string()),
+  memberRolesRough: z.record(z.string(), z.string()).optional(),
 });
 
 export type Member = z.infer<typeof memberSchema>;
@@ -31,4 +33,5 @@ export interface FormattedReport {
   nextWeek: string;
   trouble: string;
   memberProgress: Record<string, string>;
+  memberRoles?: Record<string, string>;
 }

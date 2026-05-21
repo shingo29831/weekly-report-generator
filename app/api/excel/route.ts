@@ -12,6 +12,7 @@ const formattedReportSchema = z.object({
   nextWeek: z.string(),
   trouble: z.string(),
   memberProgress: z.record(z.string(), z.string()),
+  memberRoles: z.record(z.string(), z.string()).optional(),
 });
 
 export async function POST(req: Request) {
@@ -24,17 +25,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Required fields are missing" }, { status: 400 });
     }
 
-    // Input validation
     const settings = settingsSchema.parse(JSON.parse(settingsStr as string));
     const report = formattedReportSchema.parse(JSON.parse(reportStr as string));
     const file = formData.get("file") as File | null;
+    const defaultTemplateFile = formData.get("defaultTemplate") as File | null;
 
     let buffer = null;
     if (file) {
       buffer = await file.arrayBuffer();
     }
 
-    const excelBuffer = await generateExcelFile(buffer, settings, report);
+    let defaultBuffer = null;
+    if (defaultTemplateFile) {
+      defaultBuffer = await defaultTemplateFile.arrayBuffer();
+    } else {
+      throw new Error("Default template is missing in request.");
+    }
+
+    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report);
     
     return new NextResponse(excelBuffer, {
       headers: {

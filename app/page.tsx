@@ -11,7 +11,7 @@ type FlowStep = "input" | "external-text" | "external-image" | "settings";
 export default function Home() {
   const {
     settings, updateSettings, input, setInput, formattedReport,
-    updateFormattedReportField, updateMemberProgress,
+    updateFormattedReportField, updateMemberProgress, updateMemberRole,
     templateState, handleFileUpload, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
@@ -161,6 +161,7 @@ export default function Home() {
                   {settings.members.map((m) => (
                     <div key={m.id} className="flex items-center gap-4 bg-white p-2 rounded border">
                       <span className="w-32 text-xs font-bold text-gray-600 truncate">{m.name}</span>
+                      <input className="w-32 border rounded p-2 text-sm bg-white" placeholder="今週の担当" value={input.memberRolesRough?.[m.id] || ""} onChange={(e) => setInput({ ...input, memberRolesRough: { ...input.memberRolesRough, [m.id]: e.target.value } })} />
                       <input className="flex-1 border rounded p-2 text-sm bg-white" placeholder="個別の担当作業があれば..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
                     </div>
                   ))}
@@ -233,11 +234,20 @@ export default function Home() {
 
                 <div className="pt-4 border-t">
                   <h4 className="font-bold mb-3">各メンバーの進捗</h4>
-                  <div className="grid gap-3">
+                  <div className="grid gap-4">
                     {settings.members.map((m) => (
-                      <div key={m.id}>
-                        <label className="block text-xs font-bold text-gray-600 mb-1">{m.name}</label>
-                        <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.memberProgress[m.id] || ""} onChange={(e) => updateMemberProgress(m.id, e.target.value)} />
+                      <div key={m.id} className="bg-indigo-50/20 p-3 rounded border">
+                        <label className="block text-sm font-bold text-gray-800 mb-2">{m.name}</label>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-gray-500 w-20">今週の担当:</span>
+                            <input className="flex-1 border rounded p-2 text-sm bg-white" value={formattedReport.memberRoles?.[m.id] || ""} onChange={(e) => updateMemberRole(m.id, e.target.value)} placeholder={`デフォルト: ${m.role || "なし"}`} />
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="text-xs text-gray-500 w-20 pt-2">進捗内容:</span>
+                            <textarea className="flex-1 border rounded p-2 text-sm bg-white" rows={2} value={formattedReport.memberProgress[m.id] || ""} onChange={(e) => updateMemberProgress(m.id, e.target.value)} />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -325,8 +335,9 @@ export default function Home() {
             <div className="grid gap-2">
               {settings.members.map((m, i) => (
                 <div key={i} className="flex gap-2 items-center bg-gray-50 p-2 rounded border">
-                  <input placeholder="出席番号" className="w-24 border rounded p-2 text-sm bg-white" value={m.id} onChange={(e) => handleMemberChange(i, "id", e.target.value)} />
+                  <input placeholder="出席番号" className="w-20 border rounded p-2 text-sm bg-white" value={m.id} onChange={(e) => handleMemberChange(i, "id", e.target.value)} />
                   <input placeholder="氏名" className="flex-1 border rounded p-2 text-sm bg-white" value={m.name} onChange={(e) => handleMemberChange(i, "name", e.target.value)} />
+                  <input placeholder="恒久的な担当作業" className="flex-1 border rounded p-2 text-sm bg-white" value={m.role || ""} onChange={(e) => handleMemberChange(i, "role", e.target.value)} />
                   <button onClick={() => removeMember(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold text-xl">×</button>
                 </div>
               ))}
