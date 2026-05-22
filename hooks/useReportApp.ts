@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport, Member } from "@/lib/schema";
 import ExcelJS from "exceljs";
+import { format, startOfWeek, addDays } from "date-fns";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -165,6 +166,7 @@ export const useReportApp = () => {
         const parsedMemberProgress: Record<string, string> = {};
         const parsedMemberRoles: Record<string, string> = {};
         if (Array.isArray(parsed.members)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           parsed.members.forEach((m: any) => {
             if (m.id) {
               parsedMemberProgress[m.id] = m.progress || "";
@@ -276,8 +278,9 @@ export const useReportApp = () => {
       } else {
         throw new Error("指定されたセル（B16:C21）にメンバー情報が見つかりませんでした。");
       }
-    } catch (error: any) {
-      alert(`読み込みエラー: ${error.message}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      alert(`読み込みエラー: ${message}`);
       return false;
     } finally {
       setIsLoading(false);
@@ -359,8 +362,9 @@ export const useReportApp = () => {
       };
       
       return true;
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      alert(message);
       return false;
     } finally {
       setIsLoading(false);
@@ -368,6 +372,11 @@ export const useReportApp = () => {
   };
 
   const generateManualPrompts = () => {
+    const targetDate = new Date();
+    const start = startOfWeek(targetDate, { weekStartsOn: 1 });
+    const end = addDays(start, 4);
+    const currentWeekStr = `${format(start, "yyyy/MM/dd")} 〜 ${format(end, "yyyy/MM/dd")}`;
+
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
     const memberListContext = settings.members.map(m => {
       const roleText = m.role ? ` (デフォルト担当: ${m.role})` : "";
@@ -382,6 +391,9 @@ export const useReportApp = () => {
     }).filter(line => !line.endsWith(": ")).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
+
+【対象期間（今週）】
+${currentWeekStr} (月曜日〜金曜日)
 
 【先生からの要求事項（週報で必ず満たすこと）】
 以下の要素を各項目に必ず盛り込んでください。
@@ -459,15 +471,9 @@ ${memberProgressList || "特筆事項なし"}
 
 ※特に前週との差分、進捗停滞、新しく発生した問題を強調してください。
  
-# 禁止事項
-
-・アニメ風
-・過剰演出
-・意味のない装飾
-・イラスト主体
- 
 # 週報データ
 
+対象期間: ${currentWeekStr}
 テーマ: ${settings.theme}
 今週の進捗: ${currentProgress}
 今週の課題: ${formattedReport?.issues || input.issuesRough || "特筆事項なし"}
