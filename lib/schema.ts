@@ -35,4 +35,5 @@ export interface FormattedReport {
   trouble: string;
   memberProgress: Record<string, string>;
   memberRoles?: Record<string, string>;
+  updatedThemeDetails?: string;
 }

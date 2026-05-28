@@ -15,7 +15,8 @@ export default function Home() {
     templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
-    importSettingsFromExcel
+    importSettingsFromExcel,
+    startDate, setStartDate, endDate, setEndDate
   } = useReportApp();
 
   const [currentStep, setCurrentStep] = useState<FlowStep>("input");
@@ -107,6 +108,34 @@ export default function Home() {
           onChange={handleFileUpload}
           className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-white file:text-blue-700 hover:file:bg-blue-100 transition-colors cursor-pointer"
         />
+      </section>
+
+      {/* --- 対象期間設定セクション（カレンダーUI） --- */}
+      <section className="bg-white p-5 rounded-lg border shadow-sm space-y-4">
+        <h2 className="text-base font-bold text-gray-800">📅 週報の対象期間設定</h2>
+        <p className="text-xs text-gray-500">
+          学校の休みなどで週初めや週終わりが変動する場合は、カレンダーから日付を変更してください。
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週初め</label>
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+              className="w-full border rounded p-2 text-sm bg-white focus:border-indigo-500 outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">週終わり</label>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => setEndDate(e.target.value)} 
+              className="w-full border rounded p-2 text-sm bg-white focus:border-indigo-500 outline-none transition-colors"
+            />
+          </div>
+        </div>
       </section>
 
       <nav className="flex space-x-4 border-b">
@@ -237,6 +266,11 @@ export default function Home() {
                   <label className="block text-sm font-bold mb-1">今週の一番困ってること</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.trouble} onChange={(e) => updateFormattedReportField("trouble", e.target.value)} />
                 </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1">プロジェクトの詳細設定（自動更新案）</label>
+                  <p className="text-xs text-gray-500 mb-1">次回以降のAI推論時のベース情報として使われます。Excel出力時に設定へ反映されます。</p>
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.updatedThemeDetails || ""} onChange={(e) => updateFormattedReportField("updatedThemeDetails", e.target.value)} />
+                </div>
 
                 <div className="pt-4 border-t">
                   <h4 className="font-bold mb-3">各メンバーの進捗</h4>
@@ -338,7 +372,7 @@ export default function Home() {
           <div className="bg-blue-50 p-4 rounded border border-blue-200 flex items-center justify-between">
             <div className="text-sm text-blue-900">
               <p className="font-bold">自動読み込み</p>
-              <p className="text-xs">アップロード済みファイルの「0420週」シートからメンバー構成を読み取ります。</p>
+              <p className="text-xs">アップロード済みファイルの「0420週」シートから班番号とメンバー構成を読み取ります。</p>
             </div>
             <button 
               onClick={handleImport}

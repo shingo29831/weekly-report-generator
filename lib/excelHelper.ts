@@ -1,7 +1,7 @@
 // @ai-role: server-side logic for manipulating Excel files, compatible with Edge runtime (no fs/path)
 
 import ExcelJS from "exceljs";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format } from "date-fns";
 import { Settings, FormattedReport } from "./schema";
 
 const applyInputStyle = (cell: ExcelJS.Cell) => {
@@ -64,7 +64,8 @@ export const generateExcelFile = async (
   report: FormattedReport,
   imageBuffer: ArrayBuffer | null,
   imageExtension: string | null,
-  targetDate: Date = new Date()
+  startDate: Date,
+  endDate: Date
 ): Promise<ArrayBuffer> => {
   let workbook = new ExcelJS.Workbook();
   const defaultWorkbook = new ExcelJS.Workbook();
@@ -96,10 +97,8 @@ export const generateExcelFile = async (
     workbook = orderedWorkbook;
   }
 
-  // 週の初め（月曜日）と、週の終わり（月曜日から4日後の金曜日）を計算
-  const start = startOfWeek(targetDate, { weekStartsOn: 1 });
-  const end = addDays(start, 4);
-  const sheetName = `${format(start, "MMdd")}週`;
+  // ユーザーが明示的に指定した週初めの日付を基準にシート名を決定
+  const sheetName = `${format(startDate, "MMdd")}週`;
 
   let targetSheet = workbook.getWorksheet(sheetName);
   if (!targetSheet) {
@@ -112,11 +111,11 @@ export const generateExcelFile = async (
   applyInputStyle(cellB2);
   
   const cellF2 = targetSheet.getCell("F2");
-  cellF2.value = format(start, "yyyy/MM/dd");
+  cellF2.value = format(startDate, "yyyy/MM/dd");
   applyInputStyle(cellF2);
 
   const cellH2 = targetSheet.getCell("H2");
-  cellH2.value = format(end, "yyyy/MM/dd");
+  cellH2.value = format(endDate, "yyyy/MM/dd");
   applyInputStyle(cellH2);
 
   const cellB8 = targetSheet.getCell("B8");

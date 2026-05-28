@@ -13,6 +13,8 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File | null;
     const defaultTemplateFile = formData.get("defaultTemplate") as File | null;
     const imageFile = formData.get("image") as File | null;
+    const startDateStr = formData.get("startDate") as string;
+    const endDateStr = formData.get("endDate") as string;
 
     let buffer = null;
     if (file) {
@@ -34,7 +36,14 @@ export async function POST(req: Request) {
       imageExtension = ext ? ext.toLowerCase() : 'png';
     }
 
-    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension);
+    if (!startDateStr || !endDateStr) {
+      throw new Error("Start date and end date are required.");
+    }
+
+    const startDate = new Date(startDateStr);
+    const endDate = new Date(endDateStr);
+
+    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension, startDate, endDate);
     
     const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
     const encodedFileName = encodeURIComponent(fileName);

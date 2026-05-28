@@ -13,6 +13,7 @@ const formattedReportSchema = z.object({
   trouble: z.string(),
   memberProgress: z.record(z.string(), z.string()),
   memberRoles: z.record(z.string(), z.string()).optional(),
+  updatedThemeDetails: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -20,8 +21,10 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const settingsStr = formData.get("settings");
     const reportStr = formData.get("report");
+    const startDateStr = formData.get("startDate");
+    const endDateStr = formData.get("endDate");
     
-    if (!settingsStr || !reportStr) {
+    if (!settingsStr || !reportStr || !startDateStr || !endDateStr) {
       return NextResponse.json({ error: "Required fields are missing" }, { status: 400 });
     }
 
@@ -51,7 +54,10 @@ export async function POST(req: Request) {
       imageExtension = ext ? ext.toLowerCase() : 'png';
     }
 
-    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension);
+    const startDate = new Date(startDateStr as string);
+    const endDate = new Date(endDateStr as string);
+
+    const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension, startDate, endDate);
     
     return new NextResponse(excelBuffer, {
       headers: {

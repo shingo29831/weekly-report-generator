@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport, Member } from "@/lib/schema";
 import ExcelJS from "exceljs";
-import { format, startOfWeek, addDays } from "date-fns";
+import { format, startOfWeek, addDays, parseISO } from "date-fns";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -38,7 +38,12 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 };
 
 export const useReportApp = () => {
+  const initialStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const initialEnd = addDays(initialStart, 4);
+
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [startDate, setStartDate] = useState<string>(format(initialStart, "yyyy-MM-dd"));
+  const [endDate, setEndDate] = useState<string>(format(initialEnd, "yyyy-MM-dd"));
   const [input, setInput] = useState<ReportInput>( { 
     freeMemo: "", 
     progressRough: "", 
@@ -183,6 +188,7 @@ export const useReportApp = () => {
           trouble: parsed.trouble || "",
           memberProgress: parsedMemberProgress,
           memberRoles: parsedMemberRoles,
+          updatedThemeDetails: parsed.updatedThemeDetails || settings.themeDetails,
         });
         setIsJsonValid(true);
       } else {
@@ -263,6 +269,10 @@ export const useReportApp = () => {
 
       if (!sheet) throw new Error("有効なワークシートが見つかりません。");
 
+      // セルB2から班番号の値をパース
+      const rawGroupNumber = sheet.getCell("B2").value?.toString().trim() || "";
+      const parsedGroupNumber = rawGroupNumber ? rawGroupNumber.replace(/[^0-9]/g, "") : settings.groupNumber;
+
       const newMembers: Member[] = [];
       for (let row = 16; row <= 21; row++) {
         const id = sheet.getCell(`B${row}`).value?.toString().trim() || "";
@@ -273,7 +283,7 @@ export const useReportApp = () => {
       }
 
       if (newMembers.length > 0) {
-        updateSettings({ ...settings, members: newMembers });
+        updateSettings({ ...settings, groupNumber: parsedGroupNumber, members: newMembers });
         return true;
       } else {
         throw new Error("指定されたセル（B16:C21）にメンバー情報が見つかりませんでした。");
@@ -300,8 +310,18 @@ export const useReportApp = () => {
     setIsLoading(true);
     try {
       const formData = new FormData();
-      formData.append("settings", JSON.stringify(settings));
+      
+      let currentSettings = settings;
+      // AIによって詳細設定のベース部分が更新されていれば適用する
+      if (currentReport.updatedThemeDetails && currentReport.updatedThemeDetails !== settings.themeDetails) {
+        currentSettings = { ...settings, themeDetails: currentReport.updatedThemeDetails };
+        updateSettings(currentSettings);
+      }
+
+      formData.append("settings", JSON.stringify(currentSettings));
       formData.append("report", JSON.stringify(currentReport));
+      formData.append("startDate", startDate);
+      formData.append("endDate", endDate);
       
       const defaultRes = await fetch("/template.xlsx");
       if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。");
@@ -312,7 +332,7 @@ export const useReportApp = () => {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
-        formData.append("file", file);
+        buffer = await file.arrayBuffer();
       } else if (templateState.source === "default") {
         formData.append("file", defaultBlob, "template.xlsx");
       }
@@ -329,7 +349,7 @@ export const useReportApp = () => {
 
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
-      const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
+      const fileName = `卒業研究（2026前期）週報_${currentSettings.groupNumber}班.xlsx`;
       
       const a = document.createElement("a");
       a.href = url;
@@ -372,9 +392,8 @@ export const useReportApp = () => {
   };
 
   const generateManualPrompts = () => {
-    const targetDate = new Date();
-    const start = startOfWeek(targetDate, { weekStartsOn: 1 });
-    const end = addDays(start, 4);
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
     const currentWeekStr = `${format(start, "yyyy/MM/dd")} 〜 ${format(end, "yyyy/MM/dd")}`;
 
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
@@ -390,7 +409,6 @@ export const useReportApp = () => {
       return `- ${m.name} (${m.id})${roleText}: ${progress}`;
     }).filter(line => !line.endsWith(": ")).join("\n");
 
-    // @note: 推論要件の2番目に、表現の最適化（箇条書き・専門用語の言い換え）を追記
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
 
 【対象期間（今週）】
@@ -403,9 +421,10 @@ ${currentWeekStr} (月曜日〜金曜日)
 ・問題、リスク（発生した問題、つまりそうなリスク、影響範囲(やばさ)。※問題がない場合は順調な理由などを記載）
 ・次のアクション（誰が何をどこまでやるか。※タスクは具体的で終わりが見えるように）
 
-【チーム構成とテーマ】
+【チーム構成とプロジェクト概要】
 テーマ: ${settings.theme}
-テーマ詳細: ${settings.themeDetails}
+現在の詳細設定（プロジェクトのベース部分）:
+${settings.themeDetails}
 メンバーリスト:
 ${memberListContext}
 
@@ -422,13 +441,15 @@ ${memberProgressList || "特筆事項なし"}
 【推論要件】
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. 表現の最適化: チーム全体の報告および各メンバーの個別の報告はすべて箇条書きで記述し、IT知識がある程度ある人が現状を大まかに把握できる内容にしてください。また、専門すぎる用語は誰でも分かるように言い換えてください（例：「YOLO」→「物体検知AI」など）。
-3. JSONテキストのみを出力すること。
+3. ベース情報の自動アップデート: 「現在の詳細設定（プロジェクトのベース部分）」に、今回の進捗や過去のコンテキストから得られた「プロジェクトの不変な部分（技術スタック、アーキテクチャの決定事項、主要な要件など）」を自動で追記・整理し、「updatedThemeDetails」として出力してください。
+4. JSONテキストのみを出力すること。
 
 {
   "progress": "チーム全体の進捗と差分",
   "issues": "今週の課題とリスク",
   "nextWeek": "来週やること（次のアクション）",
   "trouble": "今週一番困ってること（影響範囲）",
+  "updatedThemeDetails": "最新化されたプロジェクトの詳細設定（ベース部分）",
   "members": [ { "id": "...", "name": "...", "role": "今週の一時的な担当(判明した場合のみ)", "progress": "..." } ]
 }`;
 
@@ -493,6 +514,7 @@ ${memberProgressList || "特筆事項なし"}`;
     templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
-    importSettingsFromExcel
+    importSettingsFromExcel,
+    startDate, setStartDate, endDate, setEndDate
   };
 };
