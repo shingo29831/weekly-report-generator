@@ -85,7 +85,6 @@ export const useReportApp = () => {
     }
   }, []);
 
-  // テンプレート更新時に過去3週分のデータを抽出してAIコンテキストとして保持する
   useEffect(() => {
     extractPastReports(templateState);
   }, [templateState]);
@@ -124,7 +123,7 @@ export const useReportApp = () => {
           const parsedDate = new Date(f2Val);
           if (!isNaN(parsedDate.getTime())) dateVal = parsedDate.getTime();
         }
-        if (dateVal === 0) dateVal = sheet.id; // フォールバック
+        if (dateVal === 0) dateVal = sheet.id;
 
         let memberProgress = "";
         for (let row = 16; row <= 21; row++) {
@@ -269,7 +268,6 @@ export const useReportApp = () => {
 
       if (!sheet) throw new Error("有効なワークシートが見つかりません。");
 
-      // セルB2から班番号の値をパース
       const rawGroupNumber = sheet.getCell("B2").value?.toString().trim() || "";
       const parsedGroupNumber = rawGroupNumber ? rawGroupNumber.replace(/[^0-9]/g, "") : settings.groupNumber;
 
@@ -312,7 +310,6 @@ export const useReportApp = () => {
       const formData = new FormData();
       
       let currentSettings = settings;
-      // AIによって詳細設定のベース部分が更新されていれば適用する
       if (currentReport.updatedThemeDetails && currentReport.updatedThemeDetails !== settings.themeDetails) {
         currentSettings = { ...settings, themeDetails: currentReport.updatedThemeDetails };
         updateSettings(currentSettings);
@@ -440,8 +437,9 @@ ${memberProgressList || "特筆事項なし"}
 
 【推論要件】
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
-2. 表現の最適化: チーム全体の報告および各メンバーの個別の報告はすべて箇条書きで記述し、IT知識がある程度ある人が現状を大まかに把握できる内容にしてください。また、専門すぎる用語は誰でも分かるように言い換えてください（例：「YOLO」→「物体検知AI」など）。
-3. ベース情報の自動アップデート: 「現在の詳細設定（プロジェクトのベース部分）」に、今回の進捗や過去のコンテキストから得られた「プロジェクトの不変な部分（技術スタック、アーキテクチャの決定事項、主要な目的・要件など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。※注意: 現在進行中の作業、一時的な課題、今週・来週の予定など、不変ではない情報は絶対に含めないでください。
+2. 表現の最適化（簡潔さ）: チーム全体および各個人の報告は、長くなりすぎないように簡潔に要点がわかるようにしてください。必ず箇条書きを使用し、IT知識がある程度ある人がパッと見て大まかに把握できる内容にしてください（専門すぎる用語は「物体検知AI」のように一般的な言葉へ言い換えること）。
+3. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
+※絶対に守ること: 「〜を進行中である」「〜の予定である」「〜を実装している」といった現在進行中の作業状況や一時的な課題は、絶対に「updatedThemeDetails」に含めないでください。あくまでシステムの「仕様書」のような普遍的な内容に保ってください。
 4. JSONテキストのみを出力すること。
 
 {
