@@ -20,6 +20,7 @@ const formattedReportSchema = z.object({
     progress: z.number(),
     isCompleted: z.boolean(),
   })).optional(),
+  teamProgress: z.number().optional(),
 });
 
 export async function POST(req: Request) {

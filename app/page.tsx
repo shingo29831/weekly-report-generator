@@ -285,6 +285,16 @@ export default function Home() {
               <p className="text-sm text-gray-600 mb-4">セルに書き込まれる内容です。必要に応じてこの場で直接修正できます。</p>
               
               <div className="space-y-4">
+                {/* プロジェクト全体の進捗度表示・編集 */}
+                <div>
+                  <label className="block text-sm font-bold mb-1 mt-4">チーム全体の総合進捗度</label>
+                  <div className="flex items-center gap-3 bg-indigo-50 p-3 rounded border border-indigo-200">
+                    <input type="range" min="0" max="100" value={formattedReport.teamProgress ?? settings.teamProgress} onChange={(e) => updateFormattedReportField("teamProgress", Number(e.target.value))} className="flex-1 accent-indigo-600" />
+                    <input type="number" min="0" max="100" value={formattedReport.teamProgress ?? settings.teamProgress} onChange={(e) => updateFormattedReportField("teamProgress", Number(e.target.value))} className="w-16 border rounded p-1 text-sm text-right bg-gray-50 focus:bg-white" />
+                    <span className="text-xs text-gray-500">%</span>
+                  </div>
+                </div>
+
                 {/* タスク管理セクション */}
                 <div className="bg-indigo-50 p-4 rounded border border-indigo-200">
                   <div className="flex justify-between items-center mb-3">
@@ -460,7 +470,7 @@ export default function Home() {
           <div className="bg-blue-50 p-4 rounded border border-blue-200 flex items-center justify-between">
             <div className="text-sm text-blue-900">
               <p className="font-bold">自動読み込み</p>
-              <p className="text-xs">アップロード済みファイルの「0420週」シートから班番号とメンバー構成を読み取ります。</p>
+              <p className="text-xs">アップロード済みファイルの「0420週」シートからメンバー構成を読み取ります。</p>
             </div>
             <button 
               onClick={handleImport}
@@ -477,6 +487,16 @@ export default function Home() {
           </div>
           <div><label className="text-sm font-bold">詳細</label><textarea className="w-full border rounded p-2 mt-1" rows={6} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
           
+          {/* プロジェクト全体の進捗設定 */}
+          <div className="border-t pt-4">
+            <h3 className="font-bold text-gray-800 mb-4">プロジェクト全体の進捗度</h3>
+            <div className="flex items-center gap-3 bg-gray-50 p-3 rounded border">
+              <input type="range" min="0" max="100" value={settings.teamProgress} onChange={(e) => updateSettings({ ...settings, teamProgress: Number(e.target.value) })} className="flex-1" />
+              <input type="number" min="0" max="100" value={settings.teamProgress} onChange={(e) => updateSettings({ ...settings, teamProgress: Number(e.target.value) })} className="w-16 border rounded p-1 text-sm text-right bg-white" />
+              <span className="text-xs text-gray-500">%</span>
+            </div>
+          </div>
+
           {/* タスク設定 */}
           <div className="border-t pt-4">
             <div className="flex justify-between mb-4"><h3 className="font-bold text-gray-800">タスクの初期設定・管理</h3><button onClick={addSettingTask} className="text-xs bg-gray-200 px-3 py-1 rounded font-bold hover:bg-gray-300">＋ タスク追加</button></div>

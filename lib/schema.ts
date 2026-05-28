@@ -21,6 +21,7 @@ export const settingsSchema = z.object({
   themeDetails: z.string(),
   members: z.array(memberSchema),
   tasks: z.array(taskSchema).default([]),
+  teamProgress: z.number().min(0).max(100).default(0),
 });
 
 export const reportInputSchema = z.object({
@@ -46,4 +47,5 @@ export interface FormattedReport {
   memberRoles?: Record<string, string>;
   updatedThemeDetails?: string;
   updatedTasks?: Task[];
+  teamProgress?: number;
 }
