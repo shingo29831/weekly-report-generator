@@ -332,7 +332,7 @@ export const useReportApp = () => {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
-        buffer = await file.arrayBuffer();
+        formData.append("file", file); // 修正箇所：誤ってbuffer = file.arrayBuffer()としていた箇所を修正
       } else if (templateState.source === "default") {
         formData.append("file", defaultBlob, "template.xlsx");
       }
