@@ -2,6 +2,13 @@
 
 import { z } from "zod";
 
+export const taskSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  progress: z.number().min(0).max(100),
+  isCompleted: z.boolean(),
+});
+
 export const memberSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
@@ -13,6 +20,7 @@ export const settingsSchema = z.object({
   theme: z.string().min(1),
   themeDetails: z.string(),
   members: z.array(memberSchema),
+  tasks: z.array(taskSchema).default([]),
 });
 
 export const reportInputSchema = z.object({
@@ -24,6 +32,7 @@ export const reportInputSchema = z.object({
   memberRolesRough: z.record(z.string(), z.string()).optional(),
 });
 
+export type Task = z.infer<typeof taskSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type ReportInput = z.infer<typeof reportInputSchema>;
@@ -36,4 +45,5 @@ export interface FormattedReport {
   memberProgress: Record<string, string>;
   memberRoles?: Record<string, string>;
   updatedThemeDetails?: string;
+  updatedTasks?: Task[];
 }

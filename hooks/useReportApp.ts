@@ -1,7 +1,7 @@
 // @ai-role: custom hook managing state, real-time validation, and template persistence (Edge compatible)
 
 import { useState, useEffect } from "react";
-import { Settings, ReportInput, FormattedReport, Member } from "@/lib/schema";
+import { Settings, ReportInput, FormattedReport, Member, Task } from "@/lib/schema";
 import ExcelJS from "exceljs";
 import { format, startOfWeek, addDays, parseISO } from "date-fns";
 
@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: Settings = {
     { id: "2", name: "技術 花子", role: "API連携" },
     { id: "3", name: "開発 次郎", role: "DB構築" }
   ],
+  tasks: [],
 };
 
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -67,7 +68,11 @@ export const useReportApp = () => {
 
   useEffect(() => {
     const saved = localStorage.getItem("reportSettings");
-    if (saved) setSettings(JSON.parse(saved));
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (!parsed.tasks) parsed.tasks = [];
+      setSettings(parsed);
+    }
 
     const savedTemplate = localStorage.getItem("reportTemplate");
     if (savedTemplate) {
@@ -180,6 +185,17 @@ export const useReportApp = () => {
             }
           });
         }
+
+        // 解析されたタスク一覧
+        const parsedUpdatedTasks = Array.isArray(parsed.updatedTasks) 
+          ? parsed.updatedTasks.map((t: any) => ({
+              id: t.id || `task-${Math.random().toString(36).substr(2, 9)}`,
+              name: t.name || "",
+              progress: typeof t.progress === 'number' ? t.progress : 0,
+              isCompleted: !!t.isCompleted
+            }))
+          : settings.tasks;
+
         setFormattedReport({
           progress: parsed.progress || "",
           issues: parsed.issues || "",
@@ -188,6 +204,7 @@ export const useReportApp = () => {
           memberProgress: parsedMemberProgress,
           memberRoles: parsedMemberRoles,
           updatedThemeDetails: parsed.updatedThemeDetails || settings.themeDetails,
+          updatedTasks: parsedUpdatedTasks,
         });
         setIsJsonValid(true);
       } else {
@@ -203,7 +220,7 @@ export const useReportApp = () => {
     localStorage.setItem("reportSettings", JSON.stringify(newSettings));
   };
 
-  const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress" | "memberRoles">, value: string) => {
+  const updateFormattedReportField = (field: keyof Omit<FormattedReport, "memberProgress" | "memberRoles" | "updatedTasks">, value: string) => {
     if (formattedReport) setFormattedReport({ ...formattedReport, [field]: value });
   };
 
@@ -222,6 +239,29 @@ export const useReportApp = () => {
         ...formattedReport,
         memberRoles: { ...formattedReport.memberRoles, [id]: value }
       });
+    }
+  };
+
+  const updateReportTask = (index: number, field: keyof Task, value: any) => {
+    if (formattedReport && formattedReport.updatedTasks) {
+      const newTasks = [...formattedReport.updatedTasks];
+      newTasks[index] = { ...newTasks[index], [field]: value };
+      setFormattedReport({ ...formattedReport, updatedTasks: newTasks });
+    }
+  };
+
+  const addReportTask = () => {
+    if (formattedReport) {
+      const newTasks = formattedReport.updatedTasks ? [...formattedReport.updatedTasks] : [];
+      newTasks.push({ id: `task-${Date.now()}`, name: "新規タスク", progress: 0, isCompleted: false });
+      setFormattedReport({ ...formattedReport, updatedTasks: newTasks });
+    }
+  };
+
+  const removeReportTask = (index: number) => {
+    if (formattedReport && formattedReport.updatedTasks) {
+      const newTasks = formattedReport.updatedTasks.filter((_, i) => i !== index);
+      setFormattedReport({ ...formattedReport, updatedTasks: newTasks });
     }
   };
 
@@ -310,8 +350,18 @@ export const useReportApp = () => {
       const formData = new FormData();
       
       let currentSettings = settings;
+      let hasChanges = false;
+
       if (currentReport.updatedThemeDetails && currentReport.updatedThemeDetails !== settings.themeDetails) {
-        currentSettings = { ...settings, themeDetails: currentReport.updatedThemeDetails };
+        currentSettings = { ...currentSettings, themeDetails: currentReport.updatedThemeDetails };
+        hasChanges = true;
+      }
+      if (currentReport.updatedTasks) {
+        currentSettings = { ...currentSettings, tasks: currentReport.updatedTasks };
+        hasChanges = true;
+      }
+
+      if (hasChanges) {
         updateSettings(currentSettings);
       }
 
@@ -394,6 +444,11 @@ export const useReportApp = () => {
     const currentWeekStr = `${format(start, "yyyy/MM/dd")} 〜 ${format(end, "yyyy/MM/dd")}`;
 
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
+    
+    const taskListContext = settings.tasks.map(t => 
+      `- [${t.isCompleted ? '完了' : '進行中'}] ${t.name} (進捗: ${t.progress}%) (ID: ${t.id})`
+    ).join("\n") || "タスクはまだありません。";
+
     const memberListContext = settings.members.map(m => {
       const roleText = m.role ? ` (デフォルト担当: ${m.role})` : "";
       return `- ${m.name} (出席番号: ${m.id})${roleText}`;
@@ -422,6 +477,8 @@ ${currentWeekStr} (月曜日〜金曜日)
 テーマ: ${settings.theme}
 現在の詳細設定（プロジェクトのベース部分）:
 ${settings.themeDetails}
+現在のタスク一覧:
+${taskListContext}
 メンバーリスト:
 ${memberListContext}
 
@@ -438,9 +495,10 @@ ${memberProgressList || "特筆事項なし"}
 【推論要件】
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. 表現の最適化（簡潔さ）: チーム全体および各個人の報告は、長くなりすぎないように簡潔に要点がわかるようにしてください。必ず箇条書きを使用し、IT知識がある程度ある人がパッと見て大まかに把握できる内容にしてください（専門すぎる用語は「物体検知AI」のように一般的な言葉へ言い換えること）。
-3. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
+3. タスクの紐付けと進捗度: 報告内容（なにをしたか）について、該当するタスクがある場合は「なにをしたか【タスク名: 進捗度%】」という形式で箇条書きに記載してください。進捗があった場合は進捗度を更新し、新規の作業であると判断できる場合はタスク一覧に追加してください。
+4. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
 ※絶対に守ること: 「〜を進行中である」「〜の予定である」「〜を実装している」といった現在進行中の作業状況や一時的な課題は、絶対に「updatedThemeDetails」に含めないでください。あくまでシステムの「仕様書」のような普遍的な内容に保ってください。
-4. JSONテキストのみを出力すること。
+5. JSONテキストのみを出力すること。
 
 {
   "progress": "チーム全体の進捗と差分",
@@ -448,6 +506,9 @@ ${memberProgressList || "特筆事項なし"}
   "nextWeek": "来週やること（次のアクション）",
   "trouble": "今週一番困ってること（影響範囲）",
   "updatedThemeDetails": "最新化されたプロジェクトの詳細設定（ベース部分）",
+  "updatedTasks": [
+    { "id": "既存IDまたは新規ID", "name": "タスク名", "progress": 50, "isCompleted": false }
+  ],
   "members": [ { "id": "...", "name": "...", "role": "今週の一時的な担当(判明した場合のみ)", "progress": "..." } ]
 }`;
 
@@ -509,6 +570,7 @@ ${memberProgressList || "特筆事項なし"}`;
   return {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress, updateMemberRole,
+    updateReportTask, addReportTask, removeReportTask,
     templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,

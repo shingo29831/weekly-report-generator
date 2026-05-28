@@ -4,7 +4,7 @@
 
 import { useReportApp } from "@/hooks/useReportApp";
 import { useState } from "react";
-import { Member } from "@/lib/schema";
+import { Member, Task } from "@/lib/schema";
 
 type FlowStep = "input" | "external-text" | "external-image" | "settings";
 
@@ -12,6 +12,7 @@ export default function Home() {
   const {
     settings, updateSettings, input, setInput, formattedReport,
     updateFormattedReportField, updateMemberProgress, updateMemberRole,
+    updateReportTask, addReportTask, removeReportTask,
     templateState, handleFileUpload, handleImageUpload, reportImage, resetTemplate,
     isLoading, jsonInput, setJsonInput, 
     isJsonValid, downloadExcel, generateManualPrompts,
@@ -48,6 +49,35 @@ export default function Home() {
   };
   const addMember = () => updateSettings({ ...settings, members: [...settings.members, { id: "", name: "" }] });
   const removeMember = (index: number) => updateSettings({ ...settings, members: settings.members.filter((_, i) => i !== index) });
+
+  const handleSettingTaskChange = (index: number, field: keyof Task, value: any) => {
+    const newTasks = [...settings.tasks];
+    newTasks[index] = { ...newTasks[index], [field]: value };
+    updateSettings({ ...settings, tasks: newTasks });
+  };
+  const addSettingTask = () => {
+    updateSettings({ ...settings, tasks: [...settings.tasks, { id: `task-${Date.now()}`, name: "新規タスク", progress: 0, isCompleted: false }] });
+  };
+  const removeSettingTask = (index: number) => {
+    updateSettings({ ...settings, tasks: settings.tasks.filter((_, i) => i !== index) });
+  };
+
+  const handleInsertTaskToMemberProgress = (memberId: string, task: Task) => {
+    const el = document.getElementById(`member-progress-${memberId}`) as HTMLTextAreaElement;
+    if (el) {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const text = formattedReport?.memberProgress[memberId] || "";
+      const insertText = `【${task.name}: ${task.progress}%】`;
+      const newText = text.substring(0, start) + insertText + text.substring(end);
+      updateMemberProgress(memberId, newText);
+      
+      setTimeout(() => {
+        el.focus();
+        el.setSelectionRange(start + insertText.length, start + insertText.length);
+      }, 0);
+    }
+  };
 
   const handleInternalGenerate = () => alert("「サイト内で生成」機能は現在準備中です。今後のアップデートをお待ちください。");
   const handleExternalTextGenerate = () => setCurrentStep("external-text");
@@ -140,7 +170,7 @@ export default function Home() {
 
       <nav className="flex space-x-4 border-b">
         <button onClick={() => setCurrentStep("input")} className={`py-2 px-4 ${currentStep === "input" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>報告メモ入力</button>
-        <button onClick={() => setCurrentStep("settings")} className={`py-2 px-4 ${currentStep === "settings" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>班・メンバー設定</button>
+        <button onClick={() => setCurrentStep("settings")} className={`py-2 px-4 ${currentStep === "settings" ? "border-b-2 border-blue-500 font-bold" : "text-gray-500"}`}>班・メンバー・タスク設定</button>
       </nav>
 
       {/* STEP 1: メモ入力 */}
@@ -170,7 +200,7 @@ export default function Home() {
             />
           </div>
 
-          <details className="group bg-gray-50 p-4 rounded border cursor-pointer" open>
+          <details className="group bg-gray-50 p-4 rounded border cursor-pointer">
             <summary className="font-bold text-sm text-gray-700 list-none flex justify-between items-center">
               <span>さらに詳細に分けて入力する（任意・必要な場合のみ）</span>
               <span className="transition group-open:rotate-180">▼</span>
@@ -250,8 +280,36 @@ export default function Home() {
               <p className="text-sm text-gray-600 mb-4">セルに書き込まれる内容です。必要に応じてこの場で直接修正できます。</p>
               
               <div className="space-y-4">
+                {/* タスク管理セクション */}
+                <div className="bg-indigo-50 p-4 rounded border border-indigo-200">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-bold text-indigo-900">📌 タスクの更新・新規追加</h4>
+                    <button onClick={addReportTask} className="text-xs bg-white text-indigo-700 px-3 py-1 rounded font-bold hover:bg-indigo-100 border border-indigo-200">＋ タスク追加</button>
+                  </div>
+                  <div className="space-y-3">
+                    {formattedReport.updatedTasks?.map((task, i) => (
+                      <div key={task.id} className="flex flex-col gap-2 bg-white p-3 rounded border border-indigo-100 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <input type="checkbox" checked={task.isCompleted} onChange={(e) => updateReportTask(i, 'isCompleted', e.target.checked)} className="w-4 h-4 text-indigo-600" />
+                          <input className={`flex-1 border-0 border-b border-gray-200 p-1 text-sm bg-transparent focus:ring-0 focus:border-indigo-500 ${task.isCompleted ? 'line-through text-gray-400' : 'font-bold'}`} value={task.name} onChange={(e) => updateReportTask(i, 'name', e.target.value)} placeholder="タスク名" />
+                          <button onClick={() => removeReportTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold">×</button>
+                        </div>
+                        <div className="flex items-center gap-3 pl-6">
+                          <span className="text-xs font-bold text-gray-600">進捗度:</span>
+                          <input type="range" min="0" max="100" value={task.progress} onChange={(e) => updateReportTask(i, 'progress', Number(e.target.value))} className="flex-1 accent-indigo-600" />
+                          <input type="number" min="0" max="100" value={task.progress} onChange={(e) => updateReportTask(i, 'progress', Number(e.target.value))} className="w-16 border rounded p-1 text-sm text-right bg-gray-50 focus:bg-white" />
+                          <span className="text-xs text-gray-500">%</span>
+                        </div>
+                      </div>
+                    ))}
+                    {(!formattedReport.updatedTasks || formattedReport.updatedTasks.length === 0) && (
+                      <p className="text-sm text-gray-500 text-center py-2">タスクはありません。</p>
+                    )}
+                  </div>
+                </div>
+
                 <div>
-                  <label className="block text-sm font-bold mb-1">チーム全体としての今週の進捗（差分）</label>
+                  <label className="block text-sm font-bold mb-1 mt-4">チーム全体としての今週の進捗（差分）</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={3} value={formattedReport.progress} onChange={(e) => updateFormattedReportField("progress", e.target.value)} />
                 </div>
                 <div>
@@ -283,9 +341,32 @@ export default function Home() {
                             <span className="text-xs text-gray-500 w-20">今週の担当:</span>
                             <input className="flex-1 border rounded p-2 text-sm bg-white" value={formattedReport.memberRoles?.[m.id] || ""} onChange={(e) => updateMemberRole(m.id, e.target.value)} placeholder={`デフォルト: ${m.role || "なし"}`} />
                           </div>
-                          <div className="flex items-start gap-2">
-                            <span className="text-xs text-gray-500 w-20 pt-2">進捗内容:</span>
-                            <textarea className="flex-1 border rounded p-2 text-sm bg-white" rows={3} value={formattedReport.memberProgress[m.id] || ""} onChange={(e) => updateMemberProgress(m.id, e.target.value)} />
+                          <div className="flex items-start gap-2 flex-col">
+                            <div className="flex items-center w-full">
+                              <span className="text-xs text-gray-500 w-20 pt-2">進捗内容:</span>
+                              {formattedReport.updatedTasks && formattedReport.updatedTasks.length > 0 && (
+                                <div className="flex flex-wrap gap-1 ml-auto">
+                                  <span className="text-[10px] text-gray-500 self-center mr-1">タスク挿入:</span>
+                                  {formattedReport.updatedTasks.map(task => (
+                                    <button 
+                                      key={task.id} 
+                                      onClick={() => handleInsertTaskToMemberProgress(m.id, task)}
+                                      className="text-[10px] bg-white border border-indigo-200 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-50 truncate max-w-[120px]"
+                                      title={task.name}
+                                    >
+                                      {task.name} ({task.progress}%)
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <textarea 
+                              id={`member-progress-${m.id}`}
+                              className="w-full border rounded p-2 text-sm bg-white" 
+                              rows={4} 
+                              value={formattedReport.memberProgress[m.id] || ""} 
+                              onChange={(e) => updateMemberProgress(m.id, e.target.value)} 
+                            />
                           </div>
                         </div>
                       </div>
@@ -388,6 +469,30 @@ export default function Home() {
             <div><label className="text-sm font-bold">テーマ</label><input className="w-full border rounded p-2 mt-1" value={settings.theme} onChange={(e) => updateSettings({ ...settings, theme: e.target.value })} /></div>
           </div>
           <div><label className="text-sm font-bold">詳細</label><textarea className="w-full border rounded p-2 mt-1" rows={3} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
+          
+          {/* タスク設定 */}
+          <div className="border-t pt-4">
+            <div className="flex justify-between mb-4"><h3 className="font-bold text-gray-800">タスクの初期設定・管理</h3><button onClick={addSettingTask} className="text-xs bg-gray-200 px-3 py-1 rounded font-bold hover:bg-gray-300">＋ タスク追加</button></div>
+            <div className="grid gap-3">
+              {settings.tasks.map((task, i) => (
+                <div key={task.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded border">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" checked={task.isCompleted} onChange={(e) => handleSettingTaskChange(i, "isCompleted", e.target.checked)} className="w-4 h-4" />
+                    <input placeholder="タスク名" className={`flex-1 border rounded p-2 text-sm bg-white ${task.isCompleted ? 'line-through text-gray-400' : ''}`} value={task.name} onChange={(e) => handleSettingTaskChange(i, "name", e.target.value)} />
+                    <button onClick={() => removeSettingTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold text-xl">×</button>
+                  </div>
+                  <div className="flex items-center gap-3 pl-6">
+                    <span className="text-xs font-bold text-gray-600">進捗度:</span>
+                    <input type="range" min="0" max="100" value={task.progress} onChange={(e) => handleSettingTaskChange(i, "progress", Number(e.target.value))} className="flex-1" />
+                    <input type="number" min="0" max="100" value={task.progress} onChange={(e) => handleSettingTaskChange(i, "progress", Number(e.target.value))} className="w-16 border rounded p-1 text-sm text-right bg-white" />
+                    <span className="text-xs text-gray-500">%</span>
+                  </div>
+                </div>
+              ))}
+              {settings.tasks.length === 0 && <p className="text-sm text-gray-500">タスクが設定されていません。</p>}
+            </div>
+          </div>
+
           <div className="border-t pt-4">
             <div className="flex justify-between mb-4"><h3 className="font-bold text-gray-800">メンバー設定</h3><button onClick={addMember} className="text-xs bg-gray-200 px-3 py-1 rounded font-bold hover:bg-gray-300">＋ メンバー追加</button></div>
             <div className="grid gap-2">
