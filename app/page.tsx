@@ -198,7 +198,7 @@ export default function Home() {
               （例: 〇〇さんがUI設計した。API連携でエラーが出て困っている。来週はDB構築する等）
             </p>
             <textarea 
-              className="w-full border-2 rounded p-3 text-sm h-40 focus:border-indigo-500 outline-none transition-colors bg-gray-50 focus:bg-white" 
+              className="w-full border-2 rounded p-3 text-sm h-64 focus:border-indigo-500 outline-none transition-colors bg-gray-50 focus:bg-white" 
               value={input.freeMemo || ""} 
               onChange={(e) => setInput({ ...input, freeMemo: e.target.value })} 
               placeholder="ここに全てを書き込んでください。" 
@@ -214,25 +214,25 @@ export default function Home() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">進捗・差分</label>
-                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="完了・進行中・未着手など" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} />
+                  <textarea className="w-full border rounded p-3 text-sm h-40" placeholder="完了・進行中・未着手など" value={input.progressRough} onChange={(e) => setInput({ ...input, progressRough: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">問題・リスク</label>
-                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="発生した問題・影響範囲など" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} />
+                  <textarea className="w-full border rounded p-3 text-sm h-40" placeholder="発生した問題・影響範囲など" value={input.issuesRough} onChange={(e) => setInput({ ...input, issuesRough: e.target.value })} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">来週やること</label>
-                  <textarea className="w-full border rounded p-3 text-sm h-28" placeholder="次の具体的なアクション" value={input.nextWeekRough || ""} onChange={(e) => setInput({ ...input, nextWeekRough: e.target.value })} />
+                  <textarea className="w-full border rounded p-3 text-sm h-40" placeholder="次の具体的なアクション" value={input.nextWeekRough || ""} onChange={(e) => setInput({ ...input, nextWeekRough: e.target.value })} />
                 </div>
               </div>
               <div>
                 <h3 className="font-semibold mb-3 text-gray-800 text-sm">メンバー個別メモ</h3>
                 <div className="grid gap-2">
                   {settings.members.map((m) => (
-                    <div key={m.id} className="flex items-center gap-4 bg-white p-2 rounded border">
-                      <span className="w-24 text-xs font-bold text-gray-600 truncate">{m.name}</span>
-                      <input className="w-32 border rounded p-2 text-xs bg-white" placeholder="今週の担当" value={input.memberRolesRough?.[m.id] || ""} onChange={(e) => setInput({ ...input, memberRolesRough: { ...input.memberRolesRough, [m.id]: e.target.value } })} />
-                      <input className="flex-1 border rounded p-2 text-xs bg-white" placeholder="進捗（完了/進行中）・差分・問題・次やること等..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
+                    <div key={m.id} className="flex items-start gap-4 bg-white p-2 rounded border">
+                      <span className="w-24 text-xs font-bold text-gray-600 truncate mt-2">{m.name}</span>
+                      <input className="w-32 border rounded p-2 text-xs bg-white mt-1" placeholder="今週の担当" value={input.memberRolesRough?.[m.id] || ""} onChange={(e) => setInput({ ...input, memberRolesRough: { ...input.memberRolesRough, [m.id]: e.target.value } })} />
+                      <textarea className="flex-1 border rounded p-2 text-xs bg-white h-24" placeholder="進捗（完了/進行中）・差分・問題・次やること等..." value={input.memberProgressRough[m.id] || ""} onChange={(e) => setInput({ ...input, memberProgressRough: { ...input.memberProgressRough, [m.id]: e.target.value } })} />
                     </div>
                   ))}
                 </div>
@@ -295,8 +295,9 @@ export default function Home() {
                     {formattedReport.updatedTasks?.map((task, i) => (
                       <div key={task.id} className="flex flex-col gap-2 bg-white p-3 rounded border border-indigo-100 shadow-sm">
                         <div className="flex items-center gap-2">
-                          {/* ユーザーが誤って完了状態をいじらないようdisabled（または表示のわかりやすさのためreadOnly）にする */}
-                          <input type="checkbox" checked={task.isCompleted} disabled className="w-4 h-4 text-indigo-600 cursor-not-allowed" title="完了状態はExcel出力時に100%だった場合のみ自動で更新されます" />
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${task.isCompleted ? 'bg-gray-100 text-gray-500' : 'bg-indigo-100 text-indigo-700'}`}>
+                            {task.isCompleted ? '完了' : '進行中'}
+                          </span>
                           <input className={`flex-1 border-0 border-b border-gray-200 p-1 text-sm bg-transparent focus:ring-0 focus:border-indigo-500 ${task.isCompleted ? 'line-through text-gray-400' : 'font-bold'}`} value={task.name} onChange={(e) => updateReportTask(i, 'name', e.target.value)} placeholder="タスク名" />
                           <button onClick={() => removeReportTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold">×</button>
                         </div>
@@ -316,24 +317,24 @@ export default function Home() {
 
                 <div>
                   <label className="block text-sm font-bold mb-1 mt-4">チーム全体としての今週の進捗（差分）</label>
-                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={3} value={formattedReport.progress} onChange={(e) => updateFormattedReportField("progress", e.target.value)} />
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={5} value={formattedReport.progress} onChange={(e) => updateFormattedReportField("progress", e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">今週の課題（問題・リスク）</label>
-                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.issues} onChange={(e) => updateFormattedReportField("issues", e.target.value)} />
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.issues} onChange={(e) => updateFormattedReportField("issues", e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">来週やること（次のアクション）</label>
-                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.nextWeek} onChange={(e) => updateFormattedReportField("nextWeek", e.target.value)} />
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.nextWeek} onChange={(e) => updateFormattedReportField("nextWeek", e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">今週の一番困ってること</label>
-                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={2} value={formattedReport.trouble} onChange={(e) => updateFormattedReportField("trouble", e.target.value)} />
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.trouble} onChange={(e) => updateFormattedReportField("trouble", e.target.value)} />
                 </div>
                 <div>
                   <label className="block text-sm font-bold mb-1">プロジェクトの詳細設定（自動更新案）</label>
                   <p className="text-xs text-gray-500 mb-1">次回以降のAI推論時のベース情報として使われます。Excel出力時に設定へ反映されます。</p>
-                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.updatedThemeDetails || ""} onChange={(e) => updateFormattedReportField("updatedThemeDetails", e.target.value)} />
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={6} value={formattedReport.updatedThemeDetails || ""} onChange={(e) => updateFormattedReportField("updatedThemeDetails", e.target.value)} />
                 </div>
 
                 <div className="pt-4 border-t">
@@ -369,7 +370,7 @@ export default function Home() {
                             <textarea 
                               id={`member-progress-${m.id}`}
                               className="w-full border rounded p-2 text-sm bg-white" 
-                              rows={4} 
+                              rows={6} 
                               value={formattedReport.memberProgress[m.id] || ""} 
                               onChange={(e) => updateMemberProgress(m.id, e.target.value)} 
                             />
@@ -474,7 +475,7 @@ export default function Home() {
             <div><label className="text-sm font-bold">班番号</label><input className="w-full border rounded p-2 mt-1" value={settings.groupNumber} onChange={(e) => updateSettings({ ...settings, groupNumber: e.target.value })} /></div>
             <div><label className="text-sm font-bold">テーマ</label><input className="w-full border rounded p-2 mt-1" value={settings.theme} onChange={(e) => updateSettings({ ...settings, theme: e.target.value })} /></div>
           </div>
-          <div><label className="text-sm font-bold">詳細</label><textarea className="w-full border rounded p-2 mt-1" rows={3} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
+          <div><label className="text-sm font-bold">詳細</label><textarea className="w-full border rounded p-2 mt-1" rows={6} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
           
           {/* タスク設定 */}
           <div className="border-t pt-4">
@@ -483,6 +484,9 @@ export default function Home() {
               {settings.tasks.map((task, i) => (
                 <div key={task.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded border">
                   <div className="flex items-center gap-2">
+                    <span className={`text-xs font-bold px-2 py-1 rounded ${task.isCompleted ? 'bg-gray-200 text-gray-500' : 'bg-indigo-100 text-indigo-700'}`}>
+                      {task.isCompleted ? '完了' : '進行中'}
+                    </span>
                     <input placeholder="タスク名" className={`flex-1 border rounded p-2 text-sm bg-white ${task.isCompleted ? 'line-through text-gray-400' : ''}`} value={task.name} onChange={(e) => handleSettingTaskChange(i, "name", e.target.value)} />
                     <button onClick={() => removeSettingTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold text-xl">×</button>
                   </div>
