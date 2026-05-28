@@ -332,7 +332,7 @@ export const useReportApp = () => {
         formData.append("file", templateState.file);
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
-        formData.append("file", file); // 修正箇所：誤ってbuffer = file.arrayBuffer()としていた箇所を修正
+        formData.append("file", file);
       } else if (templateState.source === "default") {
         formData.append("file", defaultBlob, "template.xlsx");
       }
@@ -441,7 +441,7 @@ ${memberProgressList || "特筆事項なし"}
 【推論要件】
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. 表現の最適化: チーム全体の報告および各メンバーの個別の報告はすべて箇条書きで記述し、IT知識がある程度ある人が現状を大まかに把握できる内容にしてください。また、専門すぎる用語は誰でも分かるように言い換えてください（例：「YOLO」→「物体検知AI」など）。
-3. ベース情報の自動アップデート: 「現在の詳細設定（プロジェクトのベース部分）」に、今回の進捗や過去のコンテキストから得られた「プロジェクトの不変な部分（技術スタック、アーキテクチャの決定事項、主要な要件など）」を自動で追記・整理し、「updatedThemeDetails」として出力してください。
+3. ベース情報の自動アップデート: 「現在の詳細設定（プロジェクトのベース部分）」に、今回の進捗や過去のコンテキストから得られた「プロジェクトの不変な部分（技術スタック、アーキテクチャの決定事項、主要な目的・要件など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。※注意: 現在進行中の作業、一時的な課題、今週・来週の予定など、不変ではない情報は絶対に含めないでください。
 4. JSONテキストのみを出力すること。
 
 {
