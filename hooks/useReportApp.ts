@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   groupNumber: "0",
   theme: "AIタスク管理アプリ",
   themeDetails: "ユーザーの入力に基づいてAIが自動でタスクの優先度を判定し、スケジュールを最適化するWebアプリケーションの開発。",
+  projectGoal: "ユーザーがタスクを効率的に管理し、全体の作業時間を20%削減できるシステムを完成させること。",
   members: [
     { id: "1", name: "情報 太郎", role: "UI設計" },
     { id: "2", name: "技術 花子", role: "API連携" },
@@ -73,6 +74,7 @@ export const useReportApp = () => {
       const parsed = JSON.parse(saved);
       if (!parsed.tasks) parsed.tasks = [];
       if (typeof parsed.teamProgress !== 'number') parsed.teamProgress = 0;
+      if (!parsed.projectGoal) parsed.projectGoal = "";
       setSettings(parsed);
     }
 
@@ -205,6 +207,7 @@ export const useReportApp = () => {
           memberProgress: parsedMemberProgress,
           memberRoles: parsedMemberRoles,
           updatedThemeDetails: parsed.updatedThemeDetails || settings.themeDetails,
+          updatedProjectGoal: parsed.updatedProjectGoal || settings.projectGoal,
           updatedTasks: parsedUpdatedTasks,
           teamProgress: typeof parsed.teamProgress === 'number' ? parsed.teamProgress : settings.teamProgress,
         });
@@ -222,7 +225,6 @@ export const useReportApp = () => {
     localStorage.setItem("reportSettings", JSON.stringify(newSettings));
   };
 
-  // チーム全体の進捗など、文字列・数値の汎用的な更新用
   const updateFormattedReportField = <K extends keyof FormattedReport>(field: K, value: FormattedReport[K]) => {
     if (formattedReport) setFormattedReport({ ...formattedReport, [field]: value });
   };
@@ -371,6 +373,11 @@ export const useReportApp = () => {
         hasChanges = true;
       }
 
+      if (currentReport.updatedProjectGoal && currentReport.updatedProjectGoal !== settings.projectGoal) {
+        currentSettings = { ...currentSettings, projectGoal: currentReport.updatedProjectGoal };
+        hasChanges = true;
+      }
+
       if (currentReport.teamProgress !== undefined && currentReport.teamProgress !== settings.teamProgress) {
         currentSettings = { ...currentSettings, teamProgress: currentReport.teamProgress };
         hasChanges = true;
@@ -498,6 +505,8 @@ ${currentWeekStr} (月曜日〜金曜日)
 テーマ: ${settings.theme}
 現在の詳細設定（プロジェクトのベース部分）:
 ${settings.themeDetails}
+現在のプロジェクト目標:
+${settings.projectGoal || "未設定"}
 現在のプロジェクト全体の進捗度: ${settings.teamProgress}%
 現在のタスク一覧（未完了のみ）:
 ${taskListContext}
@@ -518,10 +527,11 @@ ${memberProgressList || "特筆事項なし"}
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. 表現の最適化（簡潔さ）: チーム全体および各個人の報告は、長くなりすぎないように簡潔に要点がわかるようにしてください。必ず箇条書きを使用し、IT知識がある程度ある人がパッと見て大まかに把握できる内容にしてください（専門すぎる用語は「物体検知AI」のように一般的な言葉へ言い換えること）。
 3. タスクの紐付けと進捗度: 報告内容（なにをしたか）について、該当するタスクがある場合は「なにをしたか【タスク名: 進捗度%】」という形式で箇条書きに記載してください。進捗があった場合は進捗度を更新し、新規の作業であると判断できる場合はタスク一覧に追加してください。
-4. プロジェクト全体の進捗度の更新: タスクの進捗状況や今週の成果を総合的に判断し、プロジェクト全体の進捗度(0〜100の数値)を更新して「teamProgress」として出力してください。
-5. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
+4. プロジェクト全体の進捗度の推定: プロジェクト全体の進捗度(0〜100の数値)は、タスクの消化具合から単純に計算するのではなく、「現在のプロジェクト目標」に対して現状の成果全体がどの程度到達しているかという観点で総合的に推定し、「teamProgress」として出力してください。
+5. プロジェクト目標の修正改善案: 現在のプロジェクト目標がより具体的でAIやチームメンバーが理解しやすい内容になるように、今週の進捗や課題を踏まえて目標の修正・改善案を考え、「updatedProjectGoal」として出力してください。（変更の必要がない場合でも、より明確な表現があれば提案してください）。
+6. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
 ※絶対に守ること: 「〜を進行中である」「〜の予定である」「〜を実装している」といった現在進行中の作業状況や一時的な課題は、絶対に「updatedThemeDetails」に含めないでください。あくまでシステムの「仕様書」のような普遍的な内容に保ってください。
-6. JSONテキストのみを出力すること。
+7. JSONテキストのみを出力すること。
 
 {
   "progress": "チーム全体の進捗と差分",
@@ -530,6 +540,7 @@ ${memberProgressList || "特筆事項なし"}
   "trouble": "今週一番困ってること（影響範囲）",
   "teamProgress": 50,
   "updatedThemeDetails": "最新化されたプロジェクトの詳細設定（ベース部分）",
+  "updatedProjectGoal": "最新化されたプロジェクト目標の修正改善案",
   "updatedTasks": [
     { "id": "既存IDまたは新規ID", "name": "タスク名", "progress": 50, "isCompleted": false }
   ],

@@ -14,6 +14,7 @@ const formattedReportSchema = z.object({
   memberProgress: z.record(z.string(), z.string()),
   memberRoles: z.record(z.string(), z.string()).optional(),
   updatedThemeDetails: z.string().optional(),
+  updatedProjectGoal: z.string().optional(),
   updatedTasks: z.array(z.object({
     id: z.string(),
     name: z.string(),

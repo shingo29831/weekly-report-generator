@@ -287,7 +287,7 @@ export default function Home() {
               <div className="space-y-4">
                 {/* プロジェクト全体の進捗度表示・編集 */}
                 <div>
-                  <label className="block text-sm font-bold mb-1 mt-4">チーム全体の総合進捗度</label>
+                  <label className="block text-sm font-bold mb-1 mt-4">チーム全体の総合進捗度（目標達成率）</label>
                   <div className="flex items-center gap-3 bg-indigo-50 p-3 rounded border border-indigo-200">
                     <input type="range" min="0" max="100" value={formattedReport.teamProgress ?? settings.teamProgress} onChange={(e) => updateFormattedReportField("teamProgress", Number(e.target.value))} className="flex-1 accent-indigo-600" />
                     <input type="number" min="0" max="100" value={formattedReport.teamProgress ?? settings.teamProgress} onChange={(e) => updateFormattedReportField("teamProgress", Number(e.target.value))} className="w-16 border rounded p-1 text-sm text-right bg-gray-50 focus:bg-white" />
@@ -341,8 +341,16 @@ export default function Home() {
                   <label className="block text-sm font-bold mb-1">今週の一番困ってること</label>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={4} value={formattedReport.trouble} onChange={(e) => updateFormattedReportField("trouble", e.target.value)} />
                 </div>
+                
+                {/* プロジェクト目標の修正改善案 */}
                 <div>
-                  <label className="block text-sm font-bold mb-1">プロジェクトの詳細設定（自動更新案）</label>
+                  <label className="block text-sm font-bold mb-1">プロジェクト目標（修正改善案）</label>
+                  <p className="text-xs text-gray-500 mb-1">AIが提案する目標の改善案です。Excel出力時に設定へ反映されます。</p>
+                  <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={3} value={formattedReport.updatedProjectGoal || ""} onChange={(e) => updateFormattedReportField("updatedProjectGoal", e.target.value)} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold mb-1 mt-2">プロジェクトの詳細設定（自動更新案）</label>
                   <p className="text-xs text-gray-500 mb-1">次回以降のAI推論時のベース情報として使われます。Excel出力時に設定へ反映されます。</p>
                   <textarea className="w-full border rounded p-2 text-sm bg-indigo-50/30" rows={6} value={formattedReport.updatedThemeDetails || ""} onChange={(e) => updateFormattedReportField("updatedThemeDetails", e.target.value)} />
                 </div>
@@ -485,7 +493,8 @@ export default function Home() {
             <div><label className="text-sm font-bold">班番号</label><input className="w-full border rounded p-2 mt-1" value={settings.groupNumber} onChange={(e) => updateSettings({ ...settings, groupNumber: e.target.value })} /></div>
             <div><label className="text-sm font-bold">テーマ</label><input className="w-full border rounded p-2 mt-1" value={settings.theme} onChange={(e) => updateSettings({ ...settings, theme: e.target.value })} /></div>
           </div>
-          <div><label className="text-sm font-bold">詳細</label><textarea className="w-full border rounded p-2 mt-1" rows={6} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
+          <div><label className="text-sm font-bold">プロジェクト目標</label><textarea className="w-full border rounded p-2 mt-1" rows={3} value={settings.projectGoal} onChange={(e) => updateSettings({ ...settings, projectGoal: e.target.value })} placeholder="プロジェクトの最終的な目標や達成条件を記述します" /></div>
+          <div><label className="text-sm font-bold">詳細（プロジェクトのベース）</label><textarea className="w-full border rounded p-2 mt-1" rows={6} value={settings.themeDetails} onChange={(e) => updateSettings({ ...settings, themeDetails: e.target.value })} /></div>
           
           {/* プロジェクト全体の進捗設定 */}
           <div className="border-t pt-4">

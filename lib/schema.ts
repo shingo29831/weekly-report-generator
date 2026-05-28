@@ -19,6 +19,7 @@ export const settingsSchema = z.object({
   groupNumber: z.string().min(1),
   theme: z.string().min(1),
   themeDetails: z.string(),
+  projectGoal: z.string().default(""),
   members: z.array(memberSchema),
   tasks: z.array(taskSchema).default([]),
   teamProgress: z.number().min(0).max(100).default(0),
@@ -46,6 +47,7 @@ export interface FormattedReport {
   memberProgress: Record<string, string>;
   memberRoles?: Record<string, string>;
   updatedThemeDetails?: string;
+  updatedProjectGoal?: string;
   updatedTasks?: Task[];
   teamProgress?: number;
 }
