@@ -246,6 +246,12 @@ export const useReportApp = () => {
     if (formattedReport && formattedReport.updatedTasks) {
       const newTasks = [...formattedReport.updatedTasks];
       newTasks[index] = { ...newTasks[index], [field]: value };
+      
+      // 進捗が100未満に修正された場合は自動的に未完了状態にする
+      if (field === "progress" && value < 100) {
+        newTasks[index].isCompleted = false;
+      }
+      
       setFormattedReport({ ...formattedReport, updatedTasks: newTasks });
     }
   };
@@ -352,17 +358,25 @@ export const useReportApp = () => {
       let currentSettings = settings;
       let hasChanges = false;
 
+      let reportTasks = currentReport.updatedTasks || currentSettings.tasks;
+      
+      // 出力時に進捗が100になっているタスクを自動的に完了状態に更新する
+      const processedTasks = reportTasks.map(t => 
+        t.progress >= 100 ? { ...t, progress: 100, isCompleted: true } : t
+      );
+
       if (currentReport.updatedThemeDetails && currentReport.updatedThemeDetails !== settings.themeDetails) {
         currentSettings = { ...currentSettings, themeDetails: currentReport.updatedThemeDetails };
         hasChanges = true;
       }
-      if (currentReport.updatedTasks) {
-        currentSettings = { ...currentSettings, tasks: currentReport.updatedTasks };
-        hasChanges = true;
-      }
+      
+      currentSettings = { ...currentSettings, tasks: processedTasks };
+      hasChanges = true; 
+      currentReport.updatedTasks = processedTasks;
 
       if (hasChanges) {
         updateSettings(currentSettings);
+        if (formattedReport) setFormattedReport({ ...formattedReport, updatedTasks: processedTasks });
       }
 
       formData.append("settings", JSON.stringify(currentSettings));
@@ -445,9 +459,11 @@ export const useReportApp = () => {
 
     const currentProgress = formattedReport?.progress || input.freeMemo || input.progressRough;
     
-    const taskListContext = settings.tasks.map(t => 
-      `- [${t.isCompleted ? '完了' : '進行中'}] ${t.name} (進捗: ${t.progress}%) (ID: ${t.id})`
-    ).join("\n") || "タスクはまだありません。";
+    // 基本の進捗（AIへ渡すタスクリスト）からは完了済みのものを除外する
+    const activeTasks = settings.tasks.filter(t => !t.isCompleted);
+    const taskListContext = activeTasks.map(t => 
+      `- [進行中] ${t.name} (進捗: ${t.progress}%) (ID: ${t.id})`
+    ).join("\n") || "進行中のタスクはありません。";
 
     const memberListContext = settings.members.map(m => {
       const roleText = m.role ? ` (デフォルト担当: ${m.role})` : "";
@@ -477,7 +493,7 @@ ${currentWeekStr} (月曜日〜金曜日)
 テーマ: ${settings.theme}
 現在の詳細設定（プロジェクトのベース部分）:
 ${settings.themeDetails}
-現在のタスク一覧:
+現在のタスク一覧（未完了のみ）:
 ${taskListContext}
 メンバーリスト:
 ${memberListContext}

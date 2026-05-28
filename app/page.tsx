@@ -53,6 +53,11 @@ export default function Home() {
   const handleSettingTaskChange = (index: number, field: keyof Task, value: any) => {
     const newTasks = [...settings.tasks];
     newTasks[index] = { ...newTasks[index], [field]: value };
+    
+    if (field === "progress" && value < 100) {
+      newTasks[index].isCompleted = false;
+    }
+    
     updateSettings({ ...settings, tasks: newTasks });
   };
   const addSettingTask = () => {
@@ -290,7 +295,8 @@ export default function Home() {
                     {formattedReport.updatedTasks?.map((task, i) => (
                       <div key={task.id} className="flex flex-col gap-2 bg-white p-3 rounded border border-indigo-100 shadow-sm">
                         <div className="flex items-center gap-2">
-                          <input type="checkbox" checked={task.isCompleted} onChange={(e) => updateReportTask(i, 'isCompleted', e.target.checked)} className="w-4 h-4 text-indigo-600" />
+                          {/* ユーザーが誤って完了状態をいじらないようdisabled（または表示のわかりやすさのためreadOnly）にする */}
+                          <input type="checkbox" checked={task.isCompleted} disabled className="w-4 h-4 text-indigo-600 cursor-not-allowed" title="完了状態はExcel出力時に100%だった場合のみ自動で更新されます" />
                           <input className={`flex-1 border-0 border-b border-gray-200 p-1 text-sm bg-transparent focus:ring-0 focus:border-indigo-500 ${task.isCompleted ? 'line-through text-gray-400' : 'font-bold'}`} value={task.name} onChange={(e) => updateReportTask(i, 'name', e.target.value)} placeholder="タスク名" />
                           <button onClick={() => removeReportTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold">×</button>
                         </div>
@@ -344,10 +350,10 @@ export default function Home() {
                           <div className="flex items-start gap-2 flex-col">
                             <div className="flex items-center w-full">
                               <span className="text-xs text-gray-500 w-20 pt-2">進捗内容:</span>
-                              {formattedReport.updatedTasks && formattedReport.updatedTasks.length > 0 && (
+                              {formattedReport.updatedTasks && formattedReport.updatedTasks.filter(t => !t.isCompleted).length > 0 && (
                                 <div className="flex flex-wrap gap-1 ml-auto">
                                   <span className="text-[10px] text-gray-500 self-center mr-1">タスク挿入:</span>
-                                  {formattedReport.updatedTasks.map(task => (
+                                  {formattedReport.updatedTasks.filter(t => !t.isCompleted).map(task => (
                                     <button 
                                       key={task.id} 
                                       onClick={() => handleInsertTaskToMemberProgress(m.id, task)}
@@ -477,7 +483,7 @@ export default function Home() {
               {settings.tasks.map((task, i) => (
                 <div key={task.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded border">
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={task.isCompleted} onChange={(e) => handleSettingTaskChange(i, "isCompleted", e.target.checked)} className="w-4 h-4" />
+                    <input type="checkbox" checked={task.isCompleted} disabled className="w-4 h-4 cursor-not-allowed" title="完了状態はExcel出力時に100%だった場合のみ自動で更新されます" />
                     <input placeholder="タスク名" className={`flex-1 border rounded p-2 text-sm bg-white ${task.isCompleted ? 'line-through text-gray-400' : ''}`} value={task.name} onChange={(e) => handleSettingTaskChange(i, "name", e.target.value)} />
                     <button onClick={() => removeSettingTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold text-xl">×</button>
                   </div>
