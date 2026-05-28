@@ -483,7 +483,6 @@ export default function Home() {
               {settings.tasks.map((task, i) => (
                 <div key={task.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded border">
                   <div className="flex items-center gap-2">
-                    <input type="checkbox" checked={task.isCompleted} disabled className="w-4 h-4 cursor-not-allowed" title="完了状態はExcel出力時に100%だった場合のみ自動で更新されます" />
                     <input placeholder="タスク名" className={`flex-1 border rounded p-2 text-sm bg-white ${task.isCompleted ? 'line-through text-gray-400' : ''}`} value={task.name} onChange={(e) => handleSettingTaskChange(i, "name", e.target.value)} />
                     <button onClick={() => removeSettingTask(i)} className="text-gray-400 hover:text-red-500 px-2 font-bold text-xl">×</button>
                   </div>
