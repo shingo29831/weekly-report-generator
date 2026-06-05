@@ -122,10 +122,29 @@ export const useReportApp = () => {
         
         const progress = sheet.getCell("B8").value?.toString() || "";
         const issuesAndNext = sheet.getCell("B11").value?.toString() || "";
-        const dateRange = `${sheet.getCell("F2").value?.toString() || ""} 〜 ${sheet.getCell("H2").value?.toString() || ""}`;
+        
+        // F2(開始日)とH2(終了日)のセル値を取得してフォーマットする
+        const f2Val = sheet.getCell("F2").value;
+        const h2Val = sheet.getCell("H2").value;
+        
+        let startDateStr = f2Val?.toString() || "";
+        let endDateStr = h2Val?.toString() || "";
+
+        if (f2Val instanceof Date) {
+          startDateStr = format(f2Val, "yyyy/MM/dd");
+        } else if (typeof f2Val === "string" && !isNaN(new Date(f2Val).getTime())) {
+          startDateStr = format(new Date(f2Val), "yyyy/MM/dd");
+        }
+
+        if (h2Val instanceof Date) {
+          endDateStr = format(h2Val, "yyyy/MM/dd");
+        } else if (typeof h2Val === "string" && !isNaN(new Date(h2Val).getTime())) {
+          endDateStr = format(new Date(h2Val), "yyyy/MM/dd");
+        }
+
+        const dateRange = `${startDateStr} 〜 ${endDateStr}`;
         
         let dateVal = 0;
-        const f2Val = sheet.getCell("F2").value;
         if (f2Val instanceof Date) {
           dateVal = f2Val.getTime();
         } else if (typeof f2Val === "string") {
@@ -154,7 +173,7 @@ export const useReportApp = () => {
         contextStr = "【過去のデータ（新しい順）】※差分の識別に利用してください\n";
         recent3.forEach((report, index) => {
           contextStr += `--- 前回から ${index + 1} つ前のデータ ---\n`;
-          contextStr += `シート名・期間: ${report.sheetName} (${report.dateRange})\n`;
+          contextStr += `対象期間: ${report.dateRange} (シート名: ${report.sheetName})\n`;
           contextStr += `チーム進捗:\n${report.progress}\n`;
           contextStr += `チーム課題・次やること:\n${report.issuesAndNext}\n`;
           contextStr += `メンバー別進捗:\n${report.memberProgress}\n\n`;
