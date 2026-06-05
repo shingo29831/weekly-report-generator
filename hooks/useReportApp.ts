@@ -501,11 +501,21 @@ export const useReportApp = () => {
       return `- ${m.name} (出席番号: ${m.id})${roleText}`;
     }).join("\n");
     
+    // JSON用のメンバーリスト（出席番号などの情報を含む）
     const memberProgressList = settings.members.map(m => {
       const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
       const tempRole = formattedReport?.memberRoles?.[m.id] || input.memberRolesRough?.[m.id] || "";
       const roleText = tempRole ? ` (一時的な担当: ${tempRole})` : "";
       return `- ${m.name} (${m.id})${roleText}: ${progress}`;
+    }).filter(line => !line.endsWith(": ")).join("\n");
+
+    // 画像用のメンバーリスト（出席番号やタスクIDなどの不要な情報を除外）
+    const memberProgressListForImage = settings.members.map(m => {
+      const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
+      const tempRole = formattedReport?.memberRoles?.[m.id] || input.memberRolesRough?.[m.id] || "";
+      const roleText = tempRole ? ` (担当: ${tempRole})` : "";
+      const cleanProgress = progress.replace(/\(ID:\s*[^)]+\)/g, "").replace(/ID:\s*[a-zA-Z0-9-]+/g, "");
+      return `- ${m.name}${roleText}: ${cleanProgress}`;
     }).filter(line => !line.endsWith(": ")).join("\n");
 
     const jsonPrompt = `以下の情報を元に、週報のデータを指定されたJSONフォーマットで出力してください。
@@ -545,7 +555,7 @@ ${memberProgressList || "特筆事項なし"}
 【推論要件】
 1. 情報の統合と振り分け: 「先生からの要求事項」に基づき、「自由記述メモ」や「各詳細メモ」の内容を分析してください。特定の個人の作業と判明したものは個人の報告に振り分け、それ以外の全体概要を「progress」等に記載してください。
 2. 表現の最適化（簡潔さ）: チーム全体および各個人の報告は、長くなりすぎないように簡潔に要点がわかるようにしてください。必ず箇条書きを使用し、IT知識がある程度ある人がパッと見て大まかに把握できる内容にしてください（専門すぎる用語は「物体検知AI」のように一般的な言葉へ言い換えること）。
-3. タスクの紐付けと進捗度: 報告内容（なにをしたか）について、該当するタスクがある場合は「なにをしたか【タスク名: 進捗度%】」という形式で箇条書きに記載してください。進捗があった場合は進捗度を更新し、新規の作業であると判断できる場合はタスク一覧に追加してください。
+3. タスクの紐付けと進捗度: 報告内容（なにをしたか）について、該当するタスクがある場合は「なにをしたか【タスク名: 進捗度%】」という形式で箇条書きに記載してください。進捗があった場合は進捗度を更新し、新規の作業であると判断できる場合はタスク一覧に追加してください。※「progress」や各メンバーの進捗テキスト内にタスクIDや出席番号は絶対に含めないでください。
 4. プロジェクト全体の進捗度の推定: プロジェクト全体の進捗度(0〜100の数値)は、タスクの消化具合から単純に計算するのではなく、「現在のプロジェクト目標」に対して現状の成果全体がどの程度到達しているかという観点で総合的に推定し、「teamProgress」として出力してください。
 5. プロジェクト目標の修正改善案: 現在のプロジェクト目標がより具体的でAIやチームメンバーが理解しやすい内容になるように、今週の進捗や課題を踏まえて目標の修正・改善案を考え、「updatedProjectGoal」として出力してください。（変更の必要がない場合でも、より明確な表現があれば提案してください）。
 6. ベース情報の自動アップデート（厳格なルール）: 「現在の詳細設定」に、今回の進捗等から判明した「不変のシステム構成や根本的な目的（技術スタック、アーキテクチャの決定事項など）」のみを自動で追記・整理し、「updatedThemeDetails」として出力してください。
@@ -590,6 +600,7 @@ ${memberProgressList || "特筆事項なし"}
 ・前週との差分が分かるようにする
 ・文章を減らし、要点を整理
 ・読みやすさ最優先
+・タスクIDや出席番号などのシステム用の不要な情報は一切記載しないこと
  
 # レイアウト
 
@@ -616,7 +627,7 @@ ${memberProgressList || "特筆事項なし"}
 来週やること: ${formattedReport?.nextWeek || input.nextWeekRough || "特筆事項なし"}
 
 各メンバーの個別進捗:
-${memberProgressList || "特筆事項なし"}`;
+${memberProgressListForImage || "特筆事項なし"}`;
 
     return { jsonPrompt, imagePrompt, imageFileName, pastReportsContext };
   };
