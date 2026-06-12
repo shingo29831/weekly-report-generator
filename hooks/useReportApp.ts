@@ -578,6 +578,8 @@ ${memberProgressList || "特筆事項なし"}
 
     const imageFileName = `週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週`;
 
+    const currentTeamProgress = formattedReport?.teamProgress ?? settings.teamProgress;
+
     const imagePrompt = `# 依頼概要
 
 あなたは専門学校の卒業研究支援AIです。
@@ -622,6 +624,7 @@ ${memberProgressList || "特筆事項なし"}
 
 対象期間: ${currentWeekStr}
 テーマ: ${settings.theme}
+プロジェクト全体の進捗度: ${currentTeamProgress}%
 今週の進捗: ${currentProgress}
 今週の課題: ${formattedReport?.issues || input.issuesRough || "特筆事項なし"}
 来週やること: ${formattedReport?.nextWeek || input.nextWeekRough || "特筆事項なし"}
