@@ -123,7 +123,6 @@ export const useReportApp = () => {
         const progress = sheet.getCell("B8").value?.toString() || "";
         const issuesAndNext = sheet.getCell("B11").value?.toString() || "";
         
-        // F2(開始日)とH2(終了日)のセル値を取得してフォーマットする
         const f2Val = sheet.getCell("F2").value;
         const h2Val = sheet.getCell("H2").value;
         
@@ -501,7 +500,6 @@ export const useReportApp = () => {
       return `- ${m.name} (出席番号: ${m.id})${roleText}`;
     }).join("\n");
     
-    // JSON用のメンバーリスト（出席番号などの情報を含む）
     const memberProgressList = settings.members.map(m => {
       const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
       const tempRole = formattedReport?.memberRoles?.[m.id] || input.memberRolesRough?.[m.id] || "";
@@ -509,7 +507,6 @@ export const useReportApp = () => {
       return `- ${m.name} (${m.id})${roleText}: ${progress}`;
     }).filter(line => !line.endsWith(": ")).join("\n");
 
-    // 画像用のメンバーリスト（出席番号やタスクIDなどの不要な情報を除外）
     const memberProgressListForImage = settings.members.map(m => {
       const progress = formattedReport?.memberProgress[m.id] || input.memberProgressRough[m.id] || "";
       const tempRole = formattedReport?.memberRoles?.[m.id] || input.memberRolesRough?.[m.id] || "";
@@ -579,6 +576,9 @@ ${memberProgressList || "特筆事項なし"}
     const imageFileName = `週報図解_${settings.groupNumber}班${new Date().toISOString().slice(0,10).replace(/-/g,'')}週`;
 
     const currentTeamProgress = formattedReport?.teamProgress ?? settings.teamProgress;
+    const previousTeamProgress = settings.teamProgress;
+    const progressDiff = currentTeamProgress - previousTeamProgress;
+    const progressDiffStr = progressDiff > 0 ? `+${progressDiff}` : progressDiff.toString();
 
     const imagePrompt = `# 依頼概要
 
@@ -624,7 +624,7 @@ ${memberProgressList || "特筆事項なし"}
 
 対象期間: ${currentWeekStr}
 テーマ: ${settings.theme}
-プロジェクト全体の進捗度: ${currentTeamProgress}%
+プロジェクト全体の進捗度: ${currentTeamProgress}% (前週比: ${progressDiffStr}%)
 今週の進捗: ${currentProgress}
 今週の課題: ${formattedReport?.issues || input.issuesRough || "特筆事項なし"}
 来週やること: ${formattedReport?.nextWeek || input.nextWeekRough || "特筆事項なし"}
