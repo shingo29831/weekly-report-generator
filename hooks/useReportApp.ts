@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Settings, ReportInput, FormattedReport, Member, Task } from "@/lib/schema";
 import ExcelJS from "exceljs";
 import { format, startOfWeek, addDays, parseISO } from "date-fns";
+import { fetchWithRetry } from "@/lib/apiClient";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -38,6 +39,40 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
     u8arr[n] = bstr.charCodeAt(n);
   }
   return new File([u8arr], filename, { type: mime });
+};
+
+// Cloudflare Pages(Edge)でのリクエストサイズ過大によるCPUタイムアウト(503)を回避するため、送信前に画像をダウンサイズ・圧縮する
+const compressImage = async (file: File, maxWidth = 1200): Promise<File> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(img.src);
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(file);
+
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(new File([blob], file.name, { type: "image/jpeg", lastModified: Date.now() }));
+        } else {
+          resolve(file);
+        }
+      }, "image/jpeg", 0.8);
+    };
+    img.onerror = () => resolve(file);
+  });
 };
 
 export const useReportApp = () => {
@@ -107,7 +142,7 @@ export const useReportApp = () => {
         const file = dataURLtoFile(source.dataUrl, source.name);
         buffer = await file.arrayBuffer();
       } else {
-        const res = await fetch("/template.xlsx");
+        const res = await fetchWithRetry("/template.xlsx", { method: "GET" });
         if (!res.ok) return;
         buffer = await res.arrayBuffer();
       }
@@ -322,7 +357,7 @@ export const useReportApp = () => {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
         buffer = await file.arrayBuffer();
       } else {
-        const res = await fetch("/template.xlsx");
+        const res = await fetchWithRetry("/template.xlsx", { method: "GET" });
         if (!res.ok) throw new Error("基準となるファイルが見つかりません。");
         buffer = await res.arrayBuffer();
       }
@@ -415,7 +450,7 @@ export const useReportApp = () => {
       formData.append("startDate", startDate);
       formData.append("endDate", endDate);
       
-      const defaultRes = await fetch("/template.xlsx");
+      const defaultRes = await fetchWithRetry("/template.xlsx", { method: "GET" });
       if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。");
       const defaultBlob = await defaultRes.blob();
       formData.append("defaultTemplate", defaultBlob, "template.xlsx");
@@ -430,10 +465,11 @@ export const useReportApp = () => {
       }
 
       if (reportImage) {
-        formData.append("image", reportImage);
+        const compressedImage = await compressImage(reportImage);
+        formData.append("image", compressedImage);
       }
 
-      const res = await fetch("/api/excel", { method: "POST", body: formData });
+      const res = await fetchWithRetry("/api/excel", { method: "POST", body: formData });
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || "生成失敗");

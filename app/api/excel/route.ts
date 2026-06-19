@@ -3,26 +3,7 @@ export const runtime = 'edge';
 
 import { NextResponse } from "next/server";
 import { generateExcelFile } from "@/lib/excelHelper";
-import { settingsSchema } from "@/lib/schema";
-import { z } from "zod";
-
-const formattedReportSchema = z.object({
-  progress: z.string(),
-  issues: z.string(),
-  nextWeek: z.string(),
-  trouble: z.string(),
-  memberProgress: z.record(z.string(), z.string()),
-  memberRoles: z.record(z.string(), z.string()).optional(),
-  updatedThemeDetails: z.string().optional(),
-  updatedProjectGoal: z.string().optional(),
-  updatedTasks: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    progress: z.number(),
-    isCompleted: z.boolean(),
-  })).optional(),
-  teamProgress: z.number().optional(),
-});
+import { settingsSchema, formattedReportSchema } from "@/lib/schema";
 
 export async function POST(req: Request) {
   try {

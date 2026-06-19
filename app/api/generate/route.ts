@@ -4,17 +4,26 @@ export const runtime = 'edge';
 
 import { NextResponse } from "next/server";
 import { generateExcelFile } from "@/lib/excelHelper";
+import { settingsSchema, formattedReportSchema } from "@/lib/schema";
 
 export async function POST(req: Request) {
   try {
     const formData = await req.formData();
-    const settings = JSON.parse(formData.get("settings") as string);
-    const report = JSON.parse(formData.get("report") as string);
+    const settingsStr = formData.get("settings");
+    const reportStr = formData.get("report");
+    const startDateStr = formData.get("startDate");
+    const endDateStr = formData.get("endDate");
+
+    if (!settingsStr || !reportStr || !startDateStr || !endDateStr) {
+      return NextResponse.json({ error: "Required fields are missing" }, { status: 400 });
+    }
+
+    const settings = settingsSchema.parse(JSON.parse(settingsStr as string));
+    const report = formattedReportSchema.parse(JSON.parse(reportStr as string));
+    
     const file = formData.get("file") as File | null;
     const defaultTemplateFile = formData.get("defaultTemplate") as File | null;
     const imageFile = formData.get("image") as File | null;
-    const startDateStr = formData.get("startDate") as string;
-    const endDateStr = formData.get("endDate") as string;
 
     let buffer = null;
     if (file) {
@@ -36,12 +45,8 @@ export async function POST(req: Request) {
       imageExtension = ext ? ext.toLowerCase() : 'png';
     }
 
-    if (!startDateStr || !endDateStr) {
-      throw new Error("Start date and end date are required.");
-    }
-
-    const startDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
+    const startDate = new Date(startDateStr as string);
+    const endDate = new Date(endDateStr as string);
 
     const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension, startDate, endDate);
     

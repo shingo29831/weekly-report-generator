@@ -34,20 +34,21 @@ export const reportInputSchema = z.object({
   memberRolesRough: z.record(z.string(), z.string()).optional(),
 });
 
+export const formattedReportSchema = z.object({
+  progress: z.string(),
+  issues: z.string(),
+  nextWeek: z.string(),
+  trouble: z.string(),
+  memberProgress: z.record(z.string(), z.string()),
+  memberRoles: z.record(z.string(), z.string()).optional(),
+  updatedThemeDetails: z.string().optional(),
+  updatedProjectGoal: z.string().optional(),
+  updatedTasks: z.array(taskSchema).optional(),
+  teamProgress: z.number().min(0).max(100).optional(),
+});
+
 export type Task = z.infer<typeof taskSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type ReportInput = z.infer<typeof reportInputSchema>;
-
-export interface FormattedReport {
-  progress: string;
-  issues: string;
-  nextWeek: string;
-  trouble: string;
-  memberProgress: Record<string, string>;
-  memberRoles?: Record<string, string>;
-  updatedThemeDetails?: string;
-  updatedProjectGoal?: string;
-  updatedTasks?: Task[];
-  teamProgress?: number;
-}
+export type FormattedReport = z.infer<typeof formattedReportSchema>;
