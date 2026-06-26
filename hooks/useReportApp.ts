@@ -1,3 +1,5 @@
+// hooks/useReportApp.ts
+
 // @ai-role: custom hook managing state, real-time validation, and template persistence (Edge compatible)
 
 import { useState, useEffect } from "react";
@@ -5,6 +7,7 @@ import { Settings, ReportInput, FormattedReport, Member, Task } from "@/lib/sche
 import ExcelJS from "exceljs";
 import { format, startOfWeek, addDays, parseISO } from "date-fns";
 import { fetchWithRetry } from "@/lib/apiClient";
+import { generateExcelFile } from "@/lib/excelHelper";
 
 export interface TemplateState {
   source: "default" | "uploaded" | "generated";
@@ -41,7 +44,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
   return new File([u8arr], filename, { type: mime });
 };
 
-// Cloudflare Pages(Edge)でのリクエストサイズ過大によるCPUタイムアウト(503)を回避するため、送信前に画像をダウンサイズ・圧縮する
+// Cloudflare Pages(Edge)でのリクエストサイズ過大によるCPUタイムアウト(503)やメモリ超過を回避するため、送信前に画像をダウンサイズ・圧縮する
 const compressImage = async (file: File, maxWidth = 1200): Promise<File> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -410,8 +413,6 @@ export const useReportApp = () => {
 
     setIsLoading(true);
     try {
-      const formData = new FormData();
-      
       let currentSettings = settings;
       let hasChanges = false;
 
@@ -445,37 +446,42 @@ export const useReportApp = () => {
         if (formattedReport) setFormattedReport({ ...formattedReport, updatedTasks: processedTasks });
       }
 
-      formData.append("settings", JSON.stringify(currentSettings));
-      formData.append("report", JSON.stringify(currentReport));
-      formData.append("startDate", startDate);
-      formData.append("endDate", endDate);
-      
       const defaultRes = await fetchWithRetry("/template.xlsx", { method: "GET" });
       if (!defaultRes.ok) throw new Error("初期テンプレートファイルの取得に失敗しました。");
-      const defaultBlob = await defaultRes.blob();
-      formData.append("defaultTemplate", defaultBlob, "template.xlsx");
+      const defaultBuffer = await defaultRes.arrayBuffer();
 
+      let baseBuffer: ArrayBuffer | null = null;
       if (templateState.source === "uploaded" && templateState.file) {
-        formData.append("file", templateState.file);
+        baseBuffer = await templateState.file.arrayBuffer();
       } else if (templateState.source === "generated" && templateState.dataUrl) {
         const file = dataURLtoFile(templateState.dataUrl, templateState.name);
-        formData.append("file", file);
+        baseBuffer = await file.arrayBuffer();
       } else if (templateState.source === "default") {
-        formData.append("file", defaultBlob, "template.xlsx");
+        baseBuffer = defaultBuffer.slice(0);
       }
 
+      let imgBuffer: ArrayBuffer | null = null;
+      let imgExt: string | null = null;
       if (reportImage) {
         const compressedImage = await compressImage(reportImage);
-        formData.append("image", compressedImage);
+        imgBuffer = await compressedImage.arrayBuffer();
+        const ext = compressedImage.name.split('.').pop();
+        imgExt = ext ? ext.toLowerCase() : 'png';
       }
 
-      const res = await fetchWithRetry("/api/excel", { method: "POST", body: formData });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "生成失敗");
-      }
+      // サーバーサイドAPI(Edge Runtime)を避け、クライアントサイドで直接Excelを生成する
+      const excelBuffer = await generateExcelFile(
+        baseBuffer,
+        defaultBuffer,
+        currentSettings,
+        currentReport,
+        imgBuffer,
+        imgExt,
+        new Date(startDate),
+        new Date(endDate)
+      );
 
-      const blob = await res.blob();
+      const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = window.URL.createObjectURL(blob);
       const fileName = `卒業研究（2026前期）週報_${currentSettings.groupNumber}班.xlsx`;
       
@@ -512,7 +518,7 @@ export const useReportApp = () => {
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      alert(message);
+      alert(`Excel生成エラー: ${message}`);
       return false;
     } finally {
       setIsLoading(false);
