@@ -28,3 +28,6 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# aiskel output directory
+ai_meta/
