@@ -23,6 +23,18 @@ const applyInputStyle = (cell: ExcelJS.Cell) => {
   };
 };
 
+const parseCellCoord = (addr: string): { col: number; row: number } => {
+  const match = addr.trim().match(/^([A-Za-z]+)(\d+)$/);
+  if (!match) return { col: 10, row: 8 };
+  const colLetters = match[1].toUpperCase();
+  const row = parseInt(match[2], 10);
+  let col = 0;
+  for (let i = 0; i < colLetters.length; i++) {
+    col = col * 26 + (colLetters.charCodeAt(i) - 64);
+  }
+  return { col, row };
+};
+
 // 異なるワークブックやシート間でスタイル・構造を複製
 const copySheetStructure = (srcSheet: ExcelJS.Worksheet, destSheet: ExcelJS.Worksheet) => {
   destSheet.properties = srcSheet.properties;
@@ -152,16 +164,39 @@ export const generateExcelFile = async (
     row++;
   }
 
-  // J8セル (col:9, row:7 に相当) を起点として画像を挿入
+  // J8枠のセル範囲をテンプレートの結合情報から特定し、枠サイズに完全追従させる
   if (imageBuffer) {
     const imageId = workbook.addImage({
       buffer: imageBuffer,
       extension: (imageExtension || 'png') as any,
     });
-    targetSheet.addImage(imageId, {
-      tl: { col: 9, row: 7 },
-      ext: { width: 840, height: 594 } // 画像サイズを見やすく大きくし、見切れないサイズに調整
-    });
+
+    const merges: string[] =
+      (targetSheet.model as any)?.merges ||
+      (templateSheet.model as any)?.merges ||
+      [];
+
+    const j8Merge =
+      merges.find((m: string) => m.split(':')[0]?.toUpperCase() === 'J8') ||
+      merges.find((m: string) => {
+        const parts = m.split(':');
+        if (parts.length !== 2) return false;
+        const s = parseCellCoord(parts[0]);
+        const e = parseCellCoord(parts[1]);
+        return 10 >= s.col && 10 <= e.col && 8 >= s.row && 8 <= e.row;
+      });
+
+    if (j8Merge) {
+      targetSheet.addImage(imageId, j8Merge);
+    } else {
+      const maxCol = Math.max(targetSheet.columnCount || 0, templateSheet.columnCount || 0, 20);
+      const maxRow = Math.max(targetSheet.rowCount || 0, 21);
+      targetSheet.addImage(imageId, {
+        tl: { col: 9, row: 7 },
+        br: { col: maxCol, row: maxRow },
+        editAs: 'oneCell',
+      });
+    }
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
