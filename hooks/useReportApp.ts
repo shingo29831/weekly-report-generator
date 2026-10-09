@@ -368,9 +368,18 @@ export const useReportApp = () => {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(buffer);
 
-      const sheet = workbook.getWorksheet("0420週") || 
-                    workbook.worksheets.find(s => s.name.includes("ひな形")) || 
-                    workbook.worksheets[0];
+      // 後期シートや最新週報シート、ひな形からメンバー情報を優先探索
+      const findTargetSheet = () => {
+        for (let i = workbook.worksheets.length - 1; i >= 0; i--) {
+          const s = workbook.worksheets[i];
+          if (!s.name.includes("ひな形")) {
+            if (s.getCell("B16").value || s.getCell("C16").value) return s;
+          }
+        }
+        return workbook.worksheets.find(s => s.name.includes("ひな形")) || workbook.worksheets[0];
+      };
+
+      const sheet = findTargetSheet();
 
       if (!sheet) throw new Error("有効なワークシートが見つかりません。");
 
@@ -483,7 +492,7 @@ export const useReportApp = () => {
 
       const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = window.URL.createObjectURL(blob);
-      const fileName = `卒業研究（2026前期）週報_${currentSettings.groupNumber}班.xlsx`;
+      const fileName = `卒業研究（2026後期）週報_${currentSettings.groupNumber}班.xlsx`;
       
       const a = document.createElement("a");
       a.href = url;

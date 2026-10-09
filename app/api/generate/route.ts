@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
     const excelBuffer = await generateExcelFile(buffer, defaultBuffer, settings, report, imageBuffer, imageExtension, startDate, endDate);
     
-    const fileName = `卒業研究（2026前期）週報_${settings.groupNumber}班.xlsx`;
+    const fileName = `卒業研究（2026後期）週報_${settings.groupNumber}班.xlsx`;
     const encodedFileName = encodeURIComponent(fileName);
 
     return new NextResponse(excelBuffer as unknown as BodyInit, {

@@ -98,9 +98,9 @@ export default function Home() {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <header className="flex justify-between items-center border-b pb-4">
-        <h1 className="text-2xl font-bold">週報作成支援アプリ</h1>
+        <h1 className="text-2xl font-bold">週報作成支援アプリ（後期）</h1>
         <div className="text-sm font-medium bg-gray-100 px-3 py-1 rounded border">
-          {settings.groupNumber}班：{settings.theme}
+          後期 | {settings.groupNumber}班：{settings.theme}
         </div>
       </header>
 
@@ -399,12 +399,21 @@ export default function Home() {
                   </div>
                 </div>
 
-                <button 
-                  onClick={() => setCurrentStep("external-image")} 
-                  className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 font-bold py-4 rounded text-white shadow-lg transition-all text-lg"
-                >
-                  修正内容を確定して画像生成・出力ページへ
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <button 
+                    onClick={downloadExcel} 
+                    disabled={isLoading}
+                    className="flex-1 bg-green-600 hover:bg-green-700 font-bold py-4 rounded text-white shadow-lg transition-all text-base disabled:bg-green-400"
+                  >
+                    {isLoading ? "Excelファイル出力中..." : "画像なしで直接Excelを出力する"}
+                  </button>
+                  <button 
+                    onClick={() => setCurrentStep("external-image")} 
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 font-bold py-4 rounded text-white shadow-lg transition-all text-base"
+                  >
+                    画像を作成・添付して進む（任意） →
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -415,9 +424,14 @@ export default function Home() {
       {currentStep === "external-image" && (
         <section className="space-y-8 animate-in slide-in-from-right-4">
           <div className="bg-gray-50 p-6 rounded-lg border">
-            <h3 className="text-lg font-bold mb-4">STEP 4: 週報図解（画像）の作成</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">STEP 4: 週報図解（画像）の作成（任意）</h3>
+              <span className="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-800 rounded border border-amber-300">
+                後期：画像添付は任意
+              </span>
+            </div>
             <p className="text-sm text-gray-600 mb-4">
-              出力された内容をもとに、画像を生成するためのプロンプトです。AIサイトで画像を生成し、保存してください。
+              後期からは画像の添付が必須ではなくなりました。図解を作成したい場合のみ以下のプロンプトで画像を生成してください。
             </p>
             <ExternalAILinks />
 
@@ -478,7 +492,7 @@ export default function Home() {
           <div className="bg-blue-50 p-4 rounded border border-blue-200 flex items-center justify-between">
             <div className="text-sm text-blue-900">
               <p className="font-bold">自動読み込み</p>
-              <p className="text-xs">アップロード済みファイルの「0420週」シートからメンバー構成を読み取ります。</p>
+              <p className="text-xs">アップロード済みファイルの最新シートまたはひな形からメンバー構成を読み取ります。</p>
             </div>
             <button 
               onClick={handleImport}
