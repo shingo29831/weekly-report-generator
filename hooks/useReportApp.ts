@@ -78,6 +78,84 @@ const compressImage = async (file: File, maxWidth = 1200): Promise<File> => {
   });
 };
 
+// AI出力特有の数式エスケープ \( \) や配列記号崩れ、制御文字、Markdown装飾を修復してパースする
+const repairAndParseJson = (input: string): any => {
+  try {
+    return JSON.parse(input);
+  } catch {
+    let text = input.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+    const firstBrace = text.indexOf("{");
+    const lastBrace = text.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      text = text.substring(firstBrace, lastBrace + 1);
+    }
+
+    let result = "";
+    let inString = false;
+    let escapeNext = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (inString) {
+        if (escapeNext) {
+          result += char;
+          escapeNext = false;
+        } else if (char === "\\") {
+          result += char;
+          escapeNext = true;
+        } else if (char === '"') {
+          inString = false;
+          result += char;
+        } else if (char === "\n") {
+          result += "\\n";
+        } else if (char === "\r") {
+          // ignore CR
+        } else if (char === "\t") {
+          result += "\\t";
+        } else {
+          result += char;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inString = true;
+        result += char;
+        continue;
+      }
+
+      if (char === "\\") {
+        const nextChar = text[i + 1];
+        if (nextChar === "(" || nextChar === "[") {
+          result += "[";
+          i++;
+        } else if (nextChar === ")" || nextChar === "]") {
+          result += "]";
+          i++;
+        } else if (nextChar === "{" || nextChar === "}") {
+          result += nextChar;
+          i++;
+        }
+        continue;
+      }
+
+      if (char === "(") {
+        result += "[";
+        continue;
+      }
+      if (char === ")") {
+        result += "]";
+        continue;
+      }
+
+      result += char;
+    }
+
+    result = result.replace(/,\s*([}\]])/g, "$1");
+    return JSON.parse(result);
+  }
+};
+
 export const useReportApp = () => {
   const initialStart = startOfWeek(new Date(), { weekStartsOn: 1 });
   const initialEnd = addDays(initialStart, 4);
@@ -230,7 +308,7 @@ export const useReportApp = () => {
       return;
     }
     try {
-      const parsed = JSON.parse(jsonInput);
+      const parsed = repairAndParseJson(jsonInput);
       if (parsed.progress !== undefined || Array.isArray(parsed.members)) {
         const parsedMemberProgress: Record<string, string> = {};
         const parsedMemberRoles: Record<string, string> = {};
