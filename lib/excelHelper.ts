@@ -37,6 +37,17 @@ const parseCellCoord = (addr: string): { col: number; row: number } => {
   return { col, row };
 };
 
+const colToLetter = (col: number): string => {
+  let temp = col;
+  let letter = "";
+  while (temp > 0) {
+    const mod = (temp - 1) % 26;
+    letter = String.fromCharCode(65 + mod) + letter;
+    temp = Math.floor((temp - 1) / 26);
+  }
+  return letter;
+};
+
 // 手本シートの構造・行高・列幅・書式スタイルを寸分違わず完全複製
 const copySheetStructure = (srcSheet: ExcelJS.Worksheet, destSheet: ExcelJS.Worksheet) => {
   destSheet.properties = { ...srcSheet.properties };
@@ -183,11 +194,8 @@ export const generateExcelFile = async (
     } else {
       const maxCol = Math.max(targetSheet.columnCount || 0, templateSheet.columnCount || 0, 20);
       const maxRow = Math.max(targetSheet.rowCount || 0, 21);
-      targetSheet.addImage(imageId, {
-        tl: { col: 9, row: 7 },
-        br: { col: maxCol, row: maxRow },
-        editAs: 'oneCell',
-      });
+      const endColLetter = colToLetter(maxCol);
+      targetSheet.addImage(imageId, `J8:${endColLetter}${maxRow}`);
     }
   }
 
