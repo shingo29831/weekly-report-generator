@@ -4,23 +4,25 @@ import ExcelJS from "exceljs";
 import { format } from "date-fns";
 import { Settings, FormattedReport } from "./schema";
 
-const applyInputStyle = (cell: ExcelJS.Cell) => {
-  cell.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFDAF2D0' }
-  };
-  cell.alignment = {
-    wrapText: true,
-    vertical: 'top',
-    horizontal: 'left'
-  };
-  cell.border = {
-    top: { style: 'thin' },
-    left: { style: 'thin' },
-    bottom: { style: 'thin' },
-    right: { style: 'thin' }
-  };
+// 手本シートのフォントや罫線・背景色を維持したまま値を安全に設定する
+const setCellValuePreservingStyle = (cell: ExcelJS.Cell, value: any, ensureWrap = false) => {
+  cell.value = value;
+  if (ensureWrap) {
+    cell.alignment = {
+      ...(cell.alignment || {}),
+      wrapText: true,
+      vertical: cell.alignment?.vertical || 'top',
+    };
+  }
+};
+
+const findMasterTemplateSheet = (wb: ExcelJS.Workbook): ExcelJS.Worksheet => {
+  return (
+    wb.getWorksheet("ひな形（このシートをコピー）") ||
+    wb.worksheets.find(s => s.name === "ひな形（このシートをコピー）") ||
+    wb.worksheets.find(s => s.name.includes("ひな形")) ||
+    wb.worksheets[0]
+  );
 };
 
 const parseCellCoord = (addr: string): { col: number; row: number } => {
@@ -35,36 +37,43 @@ const parseCellCoord = (addr: string): { col: number; row: number } => {
   return { col, row };
 };
 
-// 異なるワークブックやシート間でスタイル・構造を複製
+// 手本シートの構造・行高・列幅・書式スタイルを寸分違わず完全複製
 const copySheetStructure = (srcSheet: ExcelJS.Worksheet, destSheet: ExcelJS.Worksheet) => {
-  destSheet.properties = srcSheet.properties;
-  destSheet.pageSetup = srcSheet.pageSetup;
-  destSheet.views = srcSheet.views;
+  destSheet.properties = { ...srcSheet.properties };
+  destSheet.pageSetup = { ...srcSheet.pageSetup };
+  destSheet.views = srcSheet.views ? JSON.parse(JSON.stringify(srcSheet.views)) : [];
 
   srcSheet.columns.forEach((col, index) => {
     const newCol = destSheet.getColumn(index + 1);
-    newCol.width = col.width;
-    if (col.style) {
-      newCol.style = col.style;
-    }
+    if (col.width !== undefined) newCol.width = col.width;
+    if (col.hidden !== undefined) newCol.hidden = col.hidden;
+    if (col.style) newCol.style = JSON.parse(JSON.stringify(col.style));
   });
 
   srcSheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
     const newRow = destSheet.getRow(rowNumber);
-    newRow.height = row.height;
+    if (row.height !== undefined) newRow.height = row.height;
+    if (row.hidden !== undefined) newRow.hidden = row.hidden;
+
     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
       const newCell = newRow.getCell(colNumber);
       newCell.value = cell.value;
-      if (cell.style) {
-        newCell.style = cell.style;
-      }
+      if (cell.font) newCell.font = JSON.parse(JSON.stringify(cell.font));
+      if (cell.alignment) newCell.alignment = JSON.parse(JSON.stringify(cell.alignment));
+      if (cell.border) newCell.border = JSON.parse(JSON.stringify(cell.border));
+      if (cell.fill) newCell.fill = JSON.parse(JSON.stringify(cell.fill));
+      if (cell.numFmt) newCell.numFmt = cell.numFmt;
     });
   });
 
-  const merges = (srcSheet.model as any).merges;
+  const merges = (srcSheet.model as any)?.merges;
   if (merges && Array.isArray(merges)) {
     merges.forEach((merge: string) => {
-      destSheet.mergeCells(merge);
+      try {
+        destSheet.mergeCells(merge);
+      } catch {
+        // 重複結合を防止
+      }
     });
   }
 };
@@ -89,16 +98,17 @@ export const generateExcelFile = async (
     workbook = defaultWorkbook;
   }
 
-  let templateSheet = workbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
+  // 最新テンプレートから「ひな形（このシートをコピー）」を手本として確定
+  const masterTemplateSheet = findMasterTemplateSheet(defaultWorkbook);
+  if (!masterTemplateSheet) throw new Error("手本となる「ひな形（このシートをコピー）」シートが見つかりません。");
 
-  // 提出ファイルにひな形がない場合、先頭にひな形を挿入した状態の新ワークブックへ再構成
+  let templateSheet = findMasterTemplateSheet(workbook);
+
+  // 提出ファイルに手本シートがない場合は先頭に手本シートを正確な名前で復元
   if (!templateSheet) {
-    const defaultTemplateSheet = defaultWorkbook.worksheets.find(sheet => sheet.name.includes("ひな形"));
-    if (!defaultTemplateSheet) throw new Error("デフォルトの「ひな形」シートが見つかりません。");
-
     const orderedWorkbook = new ExcelJS.Workbook();
-    const newTemplateSheet = orderedWorkbook.addWorksheet("ひな形");
-    copySheetStructure(defaultTemplateSheet, newTemplateSheet);
+    const newTemplateSheet = orderedWorkbook.addWorksheet(masterTemplateSheet.name);
+    copySheetStructure(masterTemplateSheet, newTemplateSheet);
     templateSheet = newTemplateSheet;
 
     workbook.worksheets.forEach(sheet => {
@@ -115,41 +125,24 @@ export const generateExcelFile = async (
   let targetSheet = workbook.getWorksheet(sheetName);
   if (!targetSheet) {
     targetSheet = workbook.addWorksheet(sheetName);
-    copySheetStructure(templateSheet, targetSheet);
+    copySheetStructure(masterTemplateSheet, targetSheet);
   }
 
-  const cellB2 = targetSheet.getCell("B2");
-  cellB2.value = settings.groupNumber.replace(/[^0-9]/g, "");
-  applyInputStyle(cellB2);
+  // 手本シートのデザイン・書式を破壊せず値のみを設定
+  setCellValuePreservingStyle(targetSheet.getCell("B2"), settings.groupNumber.replace(/[^0-9]/g, ""));
+  setCellValuePreservingStyle(targetSheet.getCell("F2"), format(startDate, "yyyy/MM/dd"));
+  setCellValuePreservingStyle(targetSheet.getCell("H2"), format(endDate, "yyyy/MM/dd"));
+  setCellValuePreservingStyle(targetSheet.getCell("B8"), report.progress || "", true);
   
-  const cellF2 = targetSheet.getCell("F2");
-  cellF2.value = format(startDate, "yyyy/MM/dd");
-  applyInputStyle(cellF2);
-
-  const cellH2 = targetSheet.getCell("H2");
-  cellH2.value = format(endDate, "yyyy/MM/dd");
-  applyInputStyle(cellH2);
-
-  const cellB8 = targetSheet.getCell("B8");
-  cellB8.value = report.progress || "";
-  applyInputStyle(cellB8);
-  
-  const cellB11 = targetSheet.getCell("B11");
-  cellB11.value = `${report.issues || ""}\n\n【来週やること】\n${report.nextWeek || ""}\n【今週の一番困ってること】\n${report.trouble || ""}`;
-  applyInputStyle(cellB11);
+  const issueAndNextText = `${report.issues || ""}\n\n【来週やること】\n${report.nextWeek || ""}\n【今週の一番困ってること】\n${report.trouble || ""}`;
+  setCellValuePreservingStyle(targetSheet.getCell("B11"), issueAndNextText, true);
 
   let row = 16;
   for (const member of settings.members) {
     if (row > 21) break;
-    const cellID = targetSheet.getCell(`B${row}`);
-    cellID.value = member.id;
-    applyInputStyle(cellID);
+    setCellValuePreservingStyle(targetSheet.getCell(`B${row}`), member.id);
+    setCellValuePreservingStyle(targetSheet.getCell(`C${row}`), member.name);
 
-    const cellName = targetSheet.getCell(`C${row}`);
-    cellName.value = member.name;
-    applyInputStyle(cellName);
-
-    const cellProgress = targetSheet.getCell(`D${row}`);
     const tempRole = report.memberRoles?.[member.id];
     const defaultRole = member.role;
     const roleText = tempRole || defaultRole || "";
@@ -159,8 +152,7 @@ export const generateExcelFile = async (
       progressValue = `【${roleText}作業を担当】\n${progressValue}`.trim();
     }
     
-    cellProgress.value = progressValue;
-    applyInputStyle(cellProgress);
+    setCellValuePreservingStyle(targetSheet.getCell(`D${row}`), progressValue, true);
     row++;
   }
 
